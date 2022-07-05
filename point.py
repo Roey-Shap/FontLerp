@@ -37,6 +37,7 @@ class Point(object):
         if self.held:
             self.prev_coords = self.np_coords()
             self.update_coords(mouse_pos)
+            globvar.selected_point = self
         self.clicked = self.hovered and mouse_click_left
         self.held = (self.held or self.clicked) and mouse_held
 
@@ -69,7 +70,7 @@ class Point(object):
         color = custom_colors.mix_color(base_color, self.get_color(), 0.75)
         pygame.draw.circle(surface, color, (self.x, self.y), radius)
 
-        if globvar.DEBUG:
+        if globvar.DEBUG or globvar.selected_point == self:
             debug_alpha = 0.4
             s = pygame.Surface((radius*2, radius*2))  # the size of your rect
             s.set_alpha(np.floor(debug_alpha * 255))  # alpha level

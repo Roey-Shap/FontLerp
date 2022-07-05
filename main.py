@@ -9,6 +9,7 @@ import global_variables as globvar
 import custom_colors as colors
 import bezier
 import numpy as np
+import toolbar
 
 pygame.init()
 screen = globvar.screen
@@ -16,26 +17,32 @@ pygame.display.set_caption("Font Interpolater")
 clock = globvar.clock
 cursor = globvar.cursor
 
+
 origin = globvar.origin
-beziers = globvar.beziers
-hovered_point = globvar.hovered_point
+curves = globvar.curves
+toolbar = toolbar.Toolbar()
 
 
 size = 80
-offset = 150
+offset = 80
 test_array = [[size, size],
               [size, size*2],
               [size*3, size*2],
               [size*3, size]]
-b = bezier.BezierCubic2D(np.array(test_array))
+b = bezier.Bezier(np.array(test_array))
 
 b2 = b.copy()
 b2.offset(offset, offset)
 
-beziers.append(b)
-beziers.append(b2)
+b3 = bezier.Bezier(np.array(test_array[0:3]))
+b3.offset(offset*2, offset*2)
+b4 = bezier.Line(np.array(test_array[0:2]))
+b4.offset(offset*2, offset)
 
-bezier_accuracy = 15
+curves.append(b)
+curves.append(b2)
+curves.append(b3)
+curves.append(b4)
 
 # Execution loop
 running = True
@@ -69,23 +76,25 @@ while running:
     cursor.step(point_radius)
 
     # update Bezier curves in response to any points which changed
-    for bezier in beziers:
+    for curve in curves:
         # check for updates in abstract points
-        bezier.check_abstract_points(point_radius)
-        bezier.calc_tween_points(bezier_accuracy)
+        curve.check_abstract_points(point_radius)
+        curve.step()
 
 # Rendering
     screen.fill(colors.WHITE)
 
-    for bezier in beziers:
-        bezier.draw_control_lines(screen, colors.LT_GRAY)
-        bezier.draw_tween_lines(screen, colors.BLACK)
-        bezier.draw_control_points(screen, colors.LT_GRAY, radius=point_radius)
+    for curve in curves:
+        curve.draw(screen, point_radius)
 
+    # UI drawing
     cursor.draw(screen)
-    #
-    # pygame.draw.circle(screen, colors.RED, q, 3)
-    # pygame.draw.circle(screen, colors.RED, origin, 3)
+    toolbar.draw(screen)
+
+
+    # Debug drawing
+    pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
+    pygame.draw.circle(screen, colors.RED, origin, 5)
 
 
     pygame.display.flip()

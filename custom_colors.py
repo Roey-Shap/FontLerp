@@ -3,8 +3,14 @@ import numpy as np
 
 
 def mix_color(color1, color2, t):
+    color1 = to_numpy_color(color1)
+    color2 = to_numpy_color(color2)
     return (1-t)*np.array(color1) + t*np.array(color2)
 
+def to_numpy_color(color):
+    if not isinstance(color, np.ndarray):
+        return np.array(pygame.Color(color))
+    return color
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -12,6 +18,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 LIME = pygame.Color("#55FF00")
+MUTED_BLUE = pygame.Color("#3B719F")
 
 GRAY = mix_color(BLACK, WHITE, 0.45)
 LT_GRAY = mix_color(BLACK, WHITE, 0.75)

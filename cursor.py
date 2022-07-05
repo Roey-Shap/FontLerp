@@ -40,12 +40,18 @@ class Cursor(object):
 
 
         hovered_point = globvar.hovered_point
+        selected_point = globvar.selected_point
 
         # Allow the mouse to select objects
         # It should only access one at time to avoid issues of overlapping points
         if not self.mouse_held and hovered_point is not None:
             hovered_point.deselect()
             hovered_point = None
+
+        # give priority to currently selected point to be hovered over
+        if selected_point is not None:
+            if selected_point.check_mouse_hover(point_radius, self.mouse_pos):
+                hovered_point = selected_point
 
         if hovered_point is None:
             # only check points if you're available to select
@@ -57,8 +63,9 @@ class Cursor(object):
         if hovered_point is not None:
             hovered_point.handle_mouse_hover(self.mouse_pos, self.mouse_click_left, self.mouse_held)
 
-        can_multiselect = hovered_point is None
-        if can_multiselect and self.mouse_click_left:
+        not_hovering_above_point = hovered_point is None
+        if not_hovering_above_point and self.mouse_click_left:
+            globvar.selected_point = None
             self.multiselecting = True
             self.x_select_start = self.x
             self.y_select_start = self.y
