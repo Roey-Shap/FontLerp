@@ -49,7 +49,13 @@ class BezierCubic2D(object):
 
         points = points.astype(globvar.POINT_NP_DTYPE)
         self.points = None
-        self.abstract_points = [AbsPoint.Point(point) for point in points]
+        self.abstract_points = []
+        for point in points:
+            abs_point = AbsPoint.Point(point)
+            # add this abstract point to this Bezier's list of points
+            self.abstract_points.append(abs_point)
+            # mark this abstract point's existence global
+            globvar.abstract_points.append(abs_point)
 
         self.bernstein_points = None
         self.render_points = None
@@ -138,12 +144,12 @@ class BezierCubic2D(object):
     For each point, check if the mouse is hovering over it
     """
     def check_abstract_points(self, r):
-
         change_detected = False
         for i, abs_point in enumerate(self.abstract_points):
-            current_change = abs_point.check_mouse_hover(r)
+            current_change = abs_point.changed_position_this_frame
             change_detected = change_detected or current_change
-            self.points[i] = abs_point.np_coords()
+            if current_change:
+                self.points[i] = abs_point.np_coords()
 
         if change_detected:
             # take the self.points that were updated and recalculate the bernstein points

@@ -14,10 +14,12 @@ pygame.init()
 screen = globvar.screen
 pygame.display.set_caption("Font Interpolater")
 clock = globvar.clock
+cursor = globvar.cursor
 
 origin = globvar.origin
+beziers = globvar.beziers
+hovered_point = globvar.hovered_point
 
-Beziers = []
 
 size = 80
 offset = 150
@@ -30,9 +32,8 @@ b = bezier.BezierCubic2D(np.array(test_array))
 b2 = b.copy()
 b2.offset(offset, offset)
 
-
-Beziers.append(b)
-Beziers.append(b2)
+beziers.append(b)
+beziers.append(b2)
 
 bezier_accuracy = 15
 
@@ -63,8 +64,12 @@ while running:
     globvar.mouse_held = mouse_held
     globvar.mouse_click_left = mouse_click_left
 
+    # synchronize Cursor object with inputs
+    cursor.update_mouse_variables()
+    cursor.step(point_radius)
 
-    for bezier in Beziers:
+    # update Bezier curves in response to any points which changed
+    for bezier in beziers:
         # check for updates in abstract points
         bezier.check_abstract_points(point_radius)
         bezier.calc_tween_points(bezier_accuracy)
@@ -72,11 +77,12 @@ while running:
 # Rendering
     screen.fill(colors.WHITE)
 
-    for bezier in Beziers:
+    for bezier in beziers:
         bezier.draw_control_lines(screen, colors.LT_GRAY)
         bezier.draw_tween_lines(screen, colors.BLACK)
         bezier.draw_control_points(screen, colors.LT_GRAY, radius=point_radius)
 
+    cursor.draw(screen)
     #
     # pygame.draw.circle(screen, colors.RED, q, 3)
     # pygame.draw.circle(screen, colors.RED, origin, 3)

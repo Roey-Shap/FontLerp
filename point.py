@@ -15,32 +15,38 @@ class Point(object):
     def __init__(self, coords):
         self.x = coords[0]
         self.y = coords[1]
+
         self.hovered = False
         self.clicked = False
         self.held = False
+
+        self.changed_position_this_frame = False
         self.prev_coords = self.np_coords()
         return
 
     def __len__(self):
         return 2
 
-    def check_mouse_hover(self, r):
-        mouse_pos = globvar.mouse_pos
-        mouse_click_left = globvar.mouse_click_left
-        mouse_held = globvar.mouse_held
+    def check_mouse_hover(self, r, mouse_pos):
+        bounding_box = pygame.Rect(self.x - r, self.y - r, r * 2, r * 2)
+        self.hovered = bounding_box.collidepoint(mouse_pos)
+        return self.hovered
 
+    def handle_mouse_hover(self, mouse_pos, mouse_click_left, mouse_held):
+        changed_position_this_frame = False
         if self.held:
             self.prev_coords = self.np_coords()
             self.update_coords(mouse_pos)
-        bounding_box = pygame.Rect(self.x - r, self.y - r, r*2, r*2)
-        self.hovered = bounding_box.collidepoint(mouse_pos)
         self.clicked = self.hovered and mouse_click_left
         self.held = (self.held or self.clicked) and mouse_held
 
         if self.held:
-            changed_position = not np.all(np.isclose(self.prev_coords, self.np_coords()))
-            return changed_position
-        return False
+            self.changed_position_this_frame = not np.all(np.isclose(self.prev_coords, self.np_coords()))
+        return
+
+    def deselect(self):
+        self.held = False
+        return
 
     def update_coords(self, coords):
         self.x = coords[0]
@@ -49,7 +55,6 @@ class Point(object):
 
     def np_coords(self):
         return np.array([self.x, self.y], dtype=globvar.POINT_NP_DTYPE)
-
 
 # Drawing Functions
     def get_color(self):
@@ -61,7 +66,7 @@ class Point(object):
         return self.COLOR_IDLE
 
     def draw(self, surface, radius, base_color=custom_colors.BLACK):
-        color = custom_colors.mix_color(base_color, self.get_color(), 0.5)
+        color = custom_colors.mix_color(base_color, self.get_color(), 0.75)
         pygame.draw.circle(surface, color, (self.x, self.y), radius)
 
         if globvar.DEBUG:
