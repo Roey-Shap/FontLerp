@@ -1,6 +1,8 @@
 import pygame
 import custom_colors
 import global_variables as globvar
+import button
+
 
 class Toolbar(object):
     def __init__(self):

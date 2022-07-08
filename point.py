@@ -71,7 +71,7 @@ class Point(object):
         pygame.draw.circle(surface, color, (self.x, self.y), radius)
 
         if globvar.DEBUG or globvar.selected_point == self:
-            debug_alpha = 0.4
+            debug_alpha = 0.45
             s = pygame.Surface((radius*2, radius*2))  # the size of your rect
             s.set_alpha(np.floor(debug_alpha * 255))  # alpha level
             s.fill(custom_colors.LIME)

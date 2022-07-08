@@ -11,7 +11,7 @@ FPS = 30
 POINT_NP_DTYPE = np.float
 
 # Meta control variables
-DEBUG = False
+DEBUG = True
 
 # Runtime control variables
 pygame.init()
@@ -20,9 +20,10 @@ clock = pygame.time.Clock()
 cursor = cursor.Cursor()
 
 origin = pygame.math.Vector2(0, 0)
-abstract_points = []
 selected_objects = []
+abstract_points = []
 curves = []
+contours = []
 
 bezier_accuracy = 15
 

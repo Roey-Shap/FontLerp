@@ -3,13 +3,18 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+import itertools
 import sys
-import pygame
-import global_variables as globvar
-import custom_colors as colors
-import bezier
+import time
 import numpy as np
 import toolbar
+import global_variables as globvar
+import custom_colors as colors
+import fonts
+
+import pygame
+import bezier
+import contour
 
 pygame.init()
 screen = globvar.screen
@@ -23,32 +28,60 @@ curves = globvar.curves
 toolbar = toolbar.Toolbar()
 
 
-size = 80
-offset = 80
-test_array = [[size, size],
-              [size, size*2],
-              [size*3, size*2],
-              [size*3, size]]
-b = bezier.Bezier(np.array(test_array))
+w, h = globvar.SCREEN_DIMENSIONS
 
-b2 = b.copy()
-b2.offset(offset, offset)
+size = 50
 
-b3 = bezier.Bezier(np.array(test_array[0:3]))
-b3.offset(offset*2, offset*2)
-b4 = bezier.Line(np.array(test_array[0:2]))
-b4.offset(offset*2, offset)
+circle_const = 0.5522847
+c1 = np.array([[0, 0],
+               [0.25, 0],
+               [0.5, 0.5],
+               [1, 1]])
+c2 = np.array([[1, 1],
+               [0.5, 2],
+               [0, 1],
+               [0, 0]])
+circle_a1 = np.array([[0, 0],
+                      [circle_const, 0],
+                      [1, 1 - circle_const],
+                      [1, 1]])
+circle_a2 = np.array([[1, 1],
+                      [1, 1 + circle_const],
+                      [circle_const, 2],
+                      [0, 2]])
+b = bezier.Bezier(c1 * size)
+b2 = bezier.Bezier(c2 * size)
 
-curves.append(b)
-curves.append(b2)
-curves.append(b3)
-curves.append(b4)
+cont = contour.Contour()
+cont.append_curve(b)
+cont.append_curve(b2)
+cont.offset(w/4, h/2)
+
+circle = contour.Contour()
+circle.append_curve(bezier.Bezier(circle_a1*size))
+circle.append_curve(bezier.Bezier(circle_a2*size))
+circle.append_curve(bezier.Bezier(np.array([[-row[0], row[1]] for row in circle_a1])*size))
+circle.append_curve(bezier.Bezier(np.array([[-row[0], row[1]] for row in circle_a2])*size))
+
+circle.offset(w*3/4, h/2)
+
+mapping = contour.ofer_min(circle, cont)
+mixed = contour.lerp_contours_OMin(circle, cont, mapping, 0.5)
+mixed.offset(w*1/4, -h/4)
+
+#
+# b2 = bezier.Bezier(test_array * size)
+# b2.offset(w/3, h/3)
+#
+# line = bezier.Line(np.array([[0, 0], [1, 1]])*size)
+# line.offset(w/4, h/4)
+
 
 # Execution loop
 running = True
 while running:
 
-    point_radius = 4
+    point_radius = 3
 
 # Clock Updates
     clock.tick(globvar.FPS)
@@ -56,10 +89,14 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                globvar.DEBUG = not globvar.DEBUG
 
 
 
 # Get Inputs
+
     # get mouse position relative to upper-left-hand corner
     mouse_pos = pygame.mouse.get_pos()
     mouse_click = pygame.mouse.get_pressed()
@@ -84,8 +121,11 @@ while running:
 # Rendering
     screen.fill(colors.WHITE)
 
-    for curve in curves:
-        curve.draw(screen, point_radius)
+
+    for contour in globvar.contours:
+        contour.draw(screen, point_radius)
+    # for curve in curves:
+    #     curve.draw(screen, point_radius)
 
     # UI drawing
     cursor.draw(screen)
@@ -93,8 +133,12 @@ while running:
 
 
     # Debug drawing
-    pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
-    pygame.draw.circle(screen, colors.RED, origin, 5)
+    if globvar.DEBUG:
+        pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
+        pygame.draw.circle(screen, colors.RED, origin, 5)
+        debug_message = str(round(clock.get_fps(), 4)) + ", Width, Height: " + str(globvar.SCREEN_DIMENSIONS)
+        img = fonts.TEST.render(debug_message, True, colors.BLACK)
+        screen.blit(img, (20, 20))
 
 
     pygame.display.flip()

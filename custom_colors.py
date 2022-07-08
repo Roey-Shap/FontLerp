@@ -7,10 +7,12 @@ def mix_color(color1, color2, t):
     color2 = to_numpy_color(color2)
     return (1-t)*np.array(color1) + t*np.array(color2)
 
+
 def to_numpy_color(color):
     if not isinstance(color, np.ndarray):
         return np.array(pygame.Color(color))
     return color
+
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
