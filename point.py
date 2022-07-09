@@ -24,6 +24,12 @@ class Point(object):
         self.prev_coords = self.np_coords()
         return
 
+    def destroy(self):
+        index = globvar.abstract_points.index(self)
+        globvar.abstract_points.pop(index)
+
+        return
+
     def __len__(self):
         return 2
 

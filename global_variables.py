@@ -26,6 +26,7 @@ curves = []
 contours = []
 
 bezier_accuracy = 15
+t_values = None
 
 hovered_point = None
 selected_point = None

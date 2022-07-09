@@ -14,9 +14,23 @@ class Contour(object):
     def __init__(self):
         self.curves = []
         self.num_points = 0
-        self.position_sum = np.array([0, 0], dtype=globvar.POINT_NP_DTYPE)
         globvar.contours.append(self)
         return
+
+
+    def destroy(self):
+        for curve in self.curves:
+            curve.destroy()
+        index = globvar.contours.index(self)
+        globvar.contours.pop(index)
+        return
+
+    def clone(self):
+        clone = Contour()
+        for curve in self.curves:
+            clone.append_curve(curve.clone())
+
+        return clone
 
     """
     Move the Contour by some offset
@@ -27,10 +41,25 @@ class Contour(object):
         return
 
     def append_curve(self, curve):
-        print("appended curve for contour", self, "which before the add had", len(self), "curves")
+        # print("appended curve for contour", self, "which before t?he add had", len(self), "curves")
         self.curves.append(curve)
         self.num_points += curve.points.shape[0]
         return
+
+    """
+    Check that each curve is connected to the following
+    """
+    def is_closed(self):
+        num_curves = len(self)
+        for i in range(num_curves):
+            c1 = self.curves[i % num_curves]
+            c2 = self.curves[(i+1) % num_curves]
+            e1 = c1.points[-1]
+            s2 = c2.points[0]
+            if not np.all(np.isclose(e1, s2)):
+                return False
+        return True
+
 
     # TODO
     def remove_curve(self, curve):
@@ -64,7 +93,7 @@ class Contour(object):
         for i, curve in enumerate(self.curves):
             if color_gradient:
                 input_colors = [custom_colors.LT_GRAY,
-                                custom_colors.mix_color(custom_colors.BLUE, custom_colors.WHITE, i/len(self)),
+                                custom_colors.mix_color(custom_colors.GREEN, custom_colors.RED, (i+1)/(len(self)+1)),
                                 custom_colors.GRAY]
             curve.draw(surface, radius, input_colors)
 
@@ -100,6 +129,13 @@ def calc_score(curve1, curve2):
     return score
 
 
+def calc_score_MSE(curve1, curve2):
+    if len(curve1.render_points) != len(curve2.render_points):
+        raise ValueError("Tried to calculate score of curves with different numbers of points")
+    return -(np.sum((curve1.render_points - curve2.render_points) ** 2) / len(curve1.render_points))
+
+
+
 """
 Let C1 be the contour with more curves and C2 that with less.
 Determines the mapping by the OferMin method and returns
@@ -115,12 +151,17 @@ def ofer_min(contour1, contour2):
         # temp = contour1
         # contour1 = contour2
         # contour2 = temp
+    c1_closure = contour1.is_closed()
+    c2_closure = contour2.is_closed()
+    if not (c1_closure and c2_closure):
+        raise AttributeError("Both contours must be closed to find an OferMin Mapping, "
+                             "but: \n  ->C1's closure was " + str(c1_closure) + ", and C2's closure was " + str(c2_closure))
     n1 = len(contour1)
     n2 = len(contour2)
     contour1.get_curve_center_relative_angles()
     contour2.get_curve_center_relative_angles()
 
-    best_score = 0
+    best_score = -1000000
     best_mapping = None
 
     # To find the best match amongst the curves:
@@ -140,12 +181,11 @@ def ofer_min(contour1, contour2):
             for c1_index, c2_index in zip(indices, range_n2):
                 c1_curve = contour1.curves[c1_index]
                 c2_curve = contour2.curves[(c2_index + offset) % n2]
-                current_mapping_score += calc_score(c1_curve, c2_curve)
+                current_mapping_score += calc_score_MSE(c1_curve, c2_curve)
 
             if current_mapping_score > best_score:
                 best_score = current_mapping_score
                 best_mapping = [indices, offset]
-
     return best_mapping
 
 
@@ -156,7 +196,7 @@ given in the mapping should be mapped to "zero curves" in c2.
 """
 
 
-def lerp_contours_OMin(contour1, contour2, mapping, t):
+def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
     lerped_contour = Contour()
     n1 = len(contour1)
     n2 = len(contour2)
@@ -167,28 +207,45 @@ def lerp_contours_OMin(contour1, contour2, mapping, t):
     # we fill with a "zero curve"
 
     c1_chosen_curves, c2_offset = mapping
-    print(mapping)
     expected_index = 0
     last_endpoint = contour2.curves[0 + c2_offset].points[0]
+    if debug_info:
+        print("making", lerped_contour, "...")
     # note that current_c2_index is just what number curve we're on in the c1_chosen_curves array
     for current_c2_index, c1_index in enumerate(c1_chosen_curves):
         while expected_index < c1_index:
+            if debug_info:
+                print("adding curve #", expected_index, ", a mapping between a null curve and C1's", expected_index)
             # interpolate between the current c1_curve and the "zero curve" which
             # consists of four points bunched together at c2's last point
-            lerped_zero_curve_points = interpolate_np(contour1.curves[c1_index].points,
-                                           np.array([last_endpoint, last_endpoint, last_endpoint, last_endpoint]),
-                                           t)
+            lerped_zero_curve_points = interpolate_np(
+                contour1.curves[expected_index].points,
+                np.array([last_endpoint, last_endpoint, last_endpoint, last_endpoint]),
+                t)
             lerped_contour.append_curve(bezier.Bezier(lerped_zero_curve_points))
             expected_index += 1
-
+        if debug_info:
+            print("adding curve #", expected_index, ", a mapping between C2's", current_c2_index, "and C1's", c1_index)
         circular_c2_index = (current_c2_index + c2_offset) % n2
-        # now add the index you're trying to give me (we're all caught up to the expected index)
+        # now add the curve you've been trying to give me (we're all caught up to the expected index)
         # by interpolating between the current c2 curve and the corresponding c1 curve
         lerped_points = interpolate_np(contour1.curves[c1_index].points,
                                        contour2.curves[circular_c2_index].points,
                                        t)
         last_endpoint = contour2.curves[circular_c2_index].points[-1]
         lerped_contour.append_curve(bezier.Bezier(lerped_points))
+        expected_index += 1
+    while expected_index < n1:
+        if debug_info:
+            print("adding curve #", expected_index, ", a mapping between a null curve and C1's", expected_index)
+        # interpolate between the current c1_curve and the "zero curve" which
+        # consists of four points bunched together at c2's last point
+        lerped_zero_curve_points = interpolate_np(
+            contour1.curves[expected_index].points,
+            np.array([last_endpoint, last_endpoint, last_endpoint, last_endpoint]),
+            t)
+        lerped_contour.append_curve(bezier.Bezier(lerped_zero_curve_points))
+        expected_index += 1
 
     return lerped_contour
 
