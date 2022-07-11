@@ -13,7 +13,7 @@ import custom_colors as colors
 import fonts
 
 import pygame
-import bezier
+import curve
 import contour
 
 pygame.init()
@@ -34,7 +34,7 @@ globvar.t_values = np.array([[(i/globvar.bezier_accuracy)**3,
 
 w, h = globvar.SCREEN_DIMENSIONS
 
-size = 75
+base_scale = 75
 
 circle_const = 0.5522847
 c1 = np.array([[0, 0],
@@ -78,52 +78,19 @@ circle_a4 = np.array([[-1, 1],
                       [-1, 1-circle_const],
                       [-circle_const, 0],
                       [0, 0]])
-b = bezier.Bezier(c1 * size)
-b2 = bezier.Bezier(c2 * size)
-b3 = bezier.Bezier(c3 * size)
-b4 = bezier.Bezier(c4 * size)
-b5 = bezier.Bezier(c5 * size)
-b6 = bezier.Bezier(c6 * size)
 
 cont = contour.Contour()
-cont.append_curve(b)
-cont.append_curve(b2)
-cont.append_curve(b3)
-cont.append_curve(b4)
-cont.append_curve(b5)
-cont.append_curve(b6)
-cont.offset(w/4, h/(1.75))
-cont2 = cont.clone()
-cont2.offset(0, -h/3)
+cont.append_curves_from_np([c1, c2, c3, c4, c5, c6])
+cont.set_offset(4, 1.5)
+cont.set_scale(base_scale)
 
 circle = contour.Contour()
-circle.append_curve(bezier.Bezier(circle_a1*size))
-circle.append_curve(bezier.Bezier(circle_a2*size))
-circle.append_curve(bezier.Bezier(circle_a3*size))
-circle.append_curve(bezier.Bezier(circle_a4*size))
-
-print(circle.is_closed())
-
-circle.offset(w/4, h/2)
-
-mapping = contour.ofer_min(cont, circle)
-print(mapping)
-
-# mix_t = (np.sin(time.time()) + 1) / 2
-mixed_test = contour.lerp_contours_OMin(cont, circle, mapping, 0.5, debug_info=True)
-mixed_test.offset(w / 4, -h/3)
+circle.append_curves_from_np([circle_a1, circle_a2, circle_a3, circle_a4])
+circle.set_offset(4, 3.5)
+circle.set_scale(base_scale)
 
 mixed_contour = None
-
-#
-# b2 = bezier.Bezier(test_array * size)
-# b2.offset(w/3, h/3)
-#
-# line = bezier.Line(np.array([[0, 0], [1, 1]])*size)
-# line.offset(w/4, h/4)
-
-# mixed_contour = contour.lerp_contours_OMin(cont, circle, mapping, 0)
-# mixed_contour.offset(w / 8, 0)
+mapping = contour.ofer_min(cont, circle)
 
 # Execution loop
 running = True
@@ -134,14 +101,16 @@ while running:
 # Clock Updates
     clock.tick(globvar.FPS)
 
+    globvar.mouse_scroll_directions = globvar.empty_offset
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.KEYDOWN:
+        elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 globvar.DEBUG = not globvar.DEBUG
-
-
+        elif event.type == pygame.MOUSEWHEEL:
+            globvar.mouse_scroll_directions = np.array([event.x, event.y])
 
 # Get Inputs
 
@@ -150,6 +119,7 @@ while running:
     mouse_click = pygame.mouse.get_pressed()
     mouse_click_left = mouse_click[0] and not globvar.mouse_held
     mouse_held = mouse_click[0]
+    mouse_scroll_directions = globvar.mouse_scroll_directions
 
     globvar.mouse_pos = mouse_pos
     globvar.mouse_click = mouse_click
@@ -160,28 +130,43 @@ while running:
     cursor.update_mouse_variables()
     cursor.step(point_radius)
 
+
+    # Update zoom and panning
+    globvar.global_scale += mouse_scroll_directions * globvar.scroll_delta
+
+
+    # Reset the mixed contour on display
     if mixed_contour is not None:
         mixed_contour.destroy()
         mixed_contour = None
 
+        mapping = contour.ofer_min(cont, circle)
+
+
+    # Remix the contour
     mix_t = (np.sin(time.time()) + 1) / 2
     mixed_contour = contour.lerp_contours_OMin(cont, circle, mapping, mix_t)
-    mixed_contour.offset(w / 4, 0)
+    mixed_contour.set_offset(6, 2.5)
 
     # update Bezier curves in response to any points which changed
-    for curve in curves:
+    for curve in globvar.curves:
         # check for updates in abstract points
         curve.check_abstract_points(point_radius)
         curve.step()
 
+    # Update zoom scale
+    for c in globvar.contours:
+        c.set_scale(globvar.global_scale * base_scale)
+
+
 # Rendering
     screen.fill(colors.WHITE)
 
-
-    for c in globvar.contours:
-        c.draw(screen, point_radius)
-    # for curve in curves:
-    #     curve.draw(screen, point_radius)
+    cont.draw(screen, point_radius, color_gradient=True)
+    circle.draw(screen, point_radius, color_gradient=True)
+    mixed_contour.draw(screen, point_radius, color_gradient=True)
+    # for c in globvar.contours:
+    #     c.draw(screen, point_radius)
 
     # UI drawing
     cursor.draw(screen)
@@ -192,9 +177,16 @@ while running:
     if globvar.DEBUG:
         pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
         pygame.draw.circle(screen, colors.RED, origin, 5)
-        debug_message = str(round(clock.get_fps(), 4)) + ", Width, Height: " + str(globvar.SCREEN_DIMENSIONS)
-        img = fonts.TEST.render(debug_message, True, colors.BLACK)
-        screen.blit(img, (20, 20))
+
+        debug_messages = ["Framerate: " + str(round(clock.get_fps(), 4)),
+                          "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
+                          "Mapping: " + str(mapping)]
+        for i, message in enumerate(debug_messages):
+            text_rect = pygame.Rect(0, 0, w/4, h)
+            debug_text_surface = fonts.multiLineSurface(message, fonts.FONT_DEBUG, text_rect, colors.BLACK)
+            # img = fonts.FONT_DEBUG.render(message, True, colors.BLACK)
+            screen.blit(debug_text_surface, (20, (i+1) * 20))
+
 
 
     pygame.display.flip()

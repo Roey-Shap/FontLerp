@@ -3,6 +3,7 @@ import pygame
 import custom_colors
 import global_variables as globvar
 import point as AbsPoint
+import copy
 
 """ 
 Represents a 2D Cubic Bezier curve
@@ -28,15 +29,22 @@ class Curve(object):
             raise ValueError("tried inputting: \'", points, "\' as an ndarray when it wasn't one")
 
         self.num_points = points.shape[0]
+
+        self.true_points = points.copy()
         self.points = points.astype(globvar.POINT_NP_DTYPE)
+        self.origin_offset = np.array([0, 0], dtype=globvar.POINT_NP_DTYPE)
+        self.scale = 1
+
         self.abstract_points = []
         self.average_point = None
+
         self.current_contour_relative_angle = None
-        self.offset_from_origin = np.array([0, 0], dtype=globvar.POINT_NP_DTYPE)
-        for point in points:
-            abs_point = AbsPoint.Point(point)
+
+        for i, point in enumerate(self.points):
+            abs_point = AbsPoint.Point(point, (i == 0 or i == self.num_points-1))
             # add this abstract point to this Bezier's list of points
             self.abstract_points.append(abs_point)
+
             # mark this abstract point's existence global
             globvar.abstract_points.append(abs_point)
 
@@ -50,6 +58,20 @@ class Curve(object):
         globvar.curves.pop(index)
         return
 
+    def set_offset(self, origin_offset):
+        # offset the current points (4x2)
+        self.origin_offset = origin_offset
+        # self.offset_points = (self.points * self.scale) + self.origin_offset
+        # use the offset points to update all relevant data
+        self.update_points(self.true_points)
+        return
+
+    def set_scale(self, scale):
+        self.scale = scale
+        self.update_points(self.true_points)
+        return
+
+
     def get_dimensions(self):
         return np.max(self.points, axis=0) - np.min(self.points, axis=0)
 
@@ -59,13 +81,6 @@ class Curve(object):
     def get_lower_right(self):
         return np.max(self.points, axis=0)
 
-    def offset(self, offset_x, offset_y):
-        # offset the current points (4x2)
-        offset_array = np.array([offset_x, offset_y])
-
-        # use the offset points to update all relevant data
-        self.update_points(self.points + offset_array)
-        return
 
     """
     Return the angle of line formed by the endpoints in degrees
@@ -86,11 +101,11 @@ class Curve(object):
             current_change = abs_point.changed_position_this_frame
             change_detected = change_detected or current_change
             if current_change:
-                self.points[i] = abs_point.np_coords()
+                self.true_points[i] = (abs_point.np_coords()/self.scale) - self.origin_offset
 
         if change_detected:
             # take the self.points that were updated and recalculate the bernstein points
-            self.update_points(self.points)
+            self.update_points(self.true_points)
 
         return
 
@@ -106,37 +121,37 @@ class Curve(object):
         return
 
 
-class Line(Curve):
-    def __init__(self, points):
-        super().__init__(points)
-
-        if points.shape[0] != 2:
-            raise ValueError("Linear Curves must have 2 points: matrix", points,
-                             "was input with:", points.shape[0], "points")
-
-    def update_points(self, points):
-        self.points = points
-        for i, abstract_point in enumerate(self.abstract_points):
-            abstract_point.update_coords(self.points[i])
-        self.average_point = np.average(self.points, axis=0)
-        return
-
-    def get_length(self):
-        return np.linalg.norm(self.points[0]-self.points[1])
-
-    def clone(self):
-        return Line(np.ndarray.copy(self.points))
-
-# Drawing
-    def draw(self, surface, point_radius):
-        self.draw_tween_lines(surface, custom_colors.BLACK)
-        self.draw_control_points(surface, custom_colors.LT_GRAY, radius=point_radius)
-
-    def draw_tween_lines(self, surface, color):
-        pygame.draw.line(surface, color, self.points[0], self.points[1])
-
-
-
+# class Line(Curve):
+#     def __init__(self, points):
+#         super().__init__(points)
+#
+#         if points.shape[0] != 2:
+#             raise ValueError("Linear Curves must have 2 points: matrix", points,
+#                              "was input with:", points.shape[0], "points")
+#
+#         self.update_points(points)
+#
+#     def update_points(self, points):
+#         self.points = points
+#         for i, abstract_point in enumerate(self.abstract_points):
+#             abstract_point.update_coords(self.points[i])
+#         self.average_point = np.average(self.points, axis=0)
+#         return
+#
+#     def get_length(self):
+#         return np.linalg.norm(self.points[0]-self.points[1])
+#
+#     def clone(self):
+#         return Line(np.ndarray.copy(self.points))
+#
+# # Drawing
+#     def draw(self, surface, point_radius):
+#         self.draw_tween_lines(surface, custom_colors.BLACK)
+#         self.draw_control_points(surface, custom_colors.LT_GRAY, radius=point_radius)
+#
+#     def draw_tween_lines(self, surface, color):
+#         pygame.draw.line(surface, color, self.points[0], self.points[1])
+#
 
 
 class Bezier(Curve):
@@ -167,15 +182,13 @@ class Bezier(Curve):
             raise ValueError("Beziers must have 3 or 4 points: matrix", points,
                              "was input with:", points.shape[0], "points")
 
-        control_line_functions = [self.draw_control_lines_quadratic, self.draw_control_lines_cubic]
         calc_functions = [self.calc_point_quadratic, self.calc_point_cubic]
 
         self.adjustment_matrix = Bezier.adjustment_matrices[self.num_points-3]
         self.calc_point_function = calc_functions[self.num_points-3]
-        self.draw_control_lines_function = control_line_functions[self.num_points-3]
 
         self.bernstein_points = None
-        self.render_points = None
+        self.tween_points = None
 
         self.update_points(points)
         return
@@ -188,21 +201,18 @@ class Bezier(Curve):
     an inner product of (a vector of powers of t) and (linear combinations of the control points)
     cache those constant linear combinations of the control points for calculating points in between 
     """
-    def update_points(self, points):
-        self.points = points
+    def update_points(self, true_points):
+        self.true_points = true_points
+        self.points = (self.true_points + self.origin_offset) * self.scale
         for i, abstract_point in enumerate(self.abstract_points):
             abstract_point.update_coords(self.points[i])
+
         # turn pretty (nx2) points into (2xn) via transpose
         # (2xn) = (2xn)*(nxn)
         self.bernstein_points = np.matmul(self.points.T, self.adjustment_matrix)
         self.calc_tween_points()
         self.average_point = np.average(self.points, axis=0)
         return
-
-    def clone(self):
-        return Bezier(np.ndarray.copy(self.points))
-
-
 
     """
     Calculates a 2D point resulting from the weighted interpolation of the control points.
@@ -224,7 +234,7 @@ class Bezier(Curve):
         return np.matmul(self.bernstein_points, ts)
 
     def calc_tween_points(self):
-        self.render_points = np.matmul(self.bernstein_points, globvar.t_values.T).T
+        self.tween_points = np.matmul(self.bernstein_points, globvar.t_values.T).T
         return
         # self.render_points = np.zeros((accuracy, 2))
         # self.render_points = []
@@ -253,19 +263,20 @@ class Bezier(Curve):
         colors = [custom_colors.LT_GRAY, custom_colors.BLACK, custom_colors.BLUE]
         if input_colors is not None:
             colors = input_colors
-        # self.draw_control_lines(surface, colors[0])
         self.draw_tween_lines(surface, colors[1])
-        # self.draw_control_points(surface, colors[2], radius=point_radius)
+        if globvar.DEBUG:
+            self.draw_control_lines(surface, colors[0])
+            self.draw_control_points(surface, colors[2], radius=point_radius)
     """
     Draws the lines connected the precomputed "render points
     """
     def draw_tween_lines(self, surface, color, width=1):
-        num_render_points = len(self.render_points)
-        p1 = self.render_points[0]
+        num_render_points = len(self.tween_points)
+        p1 = self.tween_points[0]
         p2 = p1
         for i in range(num_render_points-1):
             p1 = p2
-            p2 = self.render_points[i+1]
+            p2 = self.tween_points[i+1]
             pygame.draw.line(surface, color, p1, p2)
 
         return
@@ -274,24 +285,15 @@ class Bezier(Curve):
     Draw the lines from the control points to show how they influence the Bezier's curvature
     """
     def draw_control_lines(self, surface, color):
-        self.draw_control_lines_function(surface, color)
-        return
-
-    def draw_control_lines_quadratic(self, surface, color):
         pygame.draw.line(surface, color, self.points[0], self.points[1])
-        pygame.draw.line(surface, color, self.points[1], self.points[2])
-        return
-
-    def draw_control_lines_cubic(self, surface, color):
-        pygame.draw.line(surface, color, self.points[0], self.points[1])
-        pygame.draw.line(surface, color, self.points[2], self.points[3])
+        pygame.draw.line(surface, color, self.points[-2], self.points[-1])
         return
 
     """
     Draws the precomputed "render points" which approximate the Bezier 
     """
     def draw_render_points(self, surface, color, radius=1):
-        for point in self.render_points:
+        for point in self.tween_points:
             p = pygame.math.Vector2(point[0], point[1])
             pygame.draw.circle(surface, color, p, radius)
 

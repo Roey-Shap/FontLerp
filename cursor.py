@@ -38,7 +38,10 @@ class Cursor(object):
             top = min(self.y, self.y_select_start)
             bounding_box = pygame.Rect(left, top, width, height)
 
-
+        if not globvar.DEBUG:
+            return
+        ## From here on, we check mouse variables.
+        ## If DEBUG is off, we don't do that
         hovered_point = globvar.hovered_point
         selected_point = globvar.selected_point
 

@@ -12,7 +12,7 @@ class Point(object):
     COLOR_HOVER = custom_colors.GRAY
     COLOR_CLICK = custom_colors.LT_GRAY
 
-    def __init__(self, coords):
+    def __init__(self, coords, is_endpoint=False):
         self.x = coords[0]
         self.y = coords[1]
 
@@ -22,6 +22,9 @@ class Point(object):
 
         self.changed_position_this_frame = False
         self.prev_coords = self.np_coords()
+
+        self.is_endpoint = is_endpoint
+        self.base_color = custom_colors.BLACK if is_endpoint else custom_colors.WHITE
         return
 
     def destroy(self):
@@ -73,24 +76,15 @@ class Point(object):
         return self.COLOR_IDLE
 
     def draw(self, surface, radius, base_color=custom_colors.BLACK):
-        color = custom_colors.mix_color(base_color, self.get_color(), 0.75)
-        pygame.draw.circle(surface, color, (self.x, self.y), radius)
+        if not self.is_endpoint:
+            radius *= 0.75
+        color = custom_colors.mix_color(self.base_color, self.get_color(), 0.5)
+        pygame.draw.circle(surface, color, self.np_coords(), radius)
 
-        if globvar.DEBUG or globvar.selected_point == self:
+        if globvar.selected_point == self:
             debug_alpha = 0.45
             s = pygame.Surface((radius*2, radius*2))  # the size of your rect
             s.set_alpha(np.floor(debug_alpha * 255))  # alpha level
             s.fill(custom_colors.LIME)
             surface.blit(s, (self.x - radius, self.y - radius))
-
-    #
-    # def __add__(self, other):
-    #     return self.coords + other.coords
-    #
-    # def __sub__(self, other):
-    #     return self.coords - other.coords
-    #
-    # def __mul__(self, other):
-    #     return self.coords - other
-    #
 
