@@ -25,6 +25,7 @@ selected_objects = []
 abstract_points = []
 curves = []
 contours = []
+glyphs = []
 
 bezier_accuracy = 15
 t_values = None

@@ -7,14 +7,17 @@ import itertools
 import sys
 import time
 import numpy as np
-import toolbar
+import custom_math
+
 import global_variables as globvar
+import toolbar
 import custom_colors as colors
 import fonts
 
 import pygame
 import curve
 import contour
+import glyph
 
 pygame.init()
 screen = globvar.screen
@@ -90,7 +93,7 @@ circle.set_offset(4, 3.5)
 circle.set_scale(base_scale)
 
 mixed_contour = None
-mapping = contour.ofer_min(cont, circle)
+mapping = contour.find_ofer_min_mapping(cont, circle)
 
 # Execution loop
 running = True
@@ -140,11 +143,11 @@ while running:
         mixed_contour.destroy()
         mixed_contour = None
 
-        mapping = contour.ofer_min(cont, circle)
+        mapping = contour.find_ofer_min_mapping(cont, circle)
 
 
     # Remix the contour
-    mix_t = (np.sin(time.time()) + 1) / 2
+    mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
     mixed_contour = contour.lerp_contours_OMin(cont, circle, mapping, mix_t)
     mixed_contour.set_offset(6, 2.5)
 

@@ -170,8 +170,7 @@ the mapping of lines in C2 to those in C1 which are determined to be most releva
 in the form [indices of c1 to take, offset of c2 to use]
 """
 
-
-def ofer_min(contour1, contour2):
+def find_ofer_min_mapping(contour1, contour2):
     # make the contour1 variable hold the larger of the two
     if len(contour2) > len(contour1):
         raise AttributeError("Contour 1 needs to have at least as many curves as Contour 2")
@@ -269,3 +268,7 @@ def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
 
     return lerped_contour
 
+def map_and_lerp(contour1, contour2, lerp_weight, mapping_function, lerping_function):
+    mapping = mapping_function(contour1, contour2)
+    lerped_contour = lerping_function(contour1, contour2, mapping, lerp_weight)
+    return lerped_contour
