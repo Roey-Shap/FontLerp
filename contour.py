@@ -10,14 +10,27 @@ import global_variables as globvar
 import numpy as np
 import itertools
 import custom_colors
+import custom_math
 import copy
+
+
+class FILL(int):
+    OUTLINE = 0
+    ADD = 1
+    SUBTRACT = -1
+
 
 class Contour(object):
     def __init__(self):
         self.curves = []
         self.num_points = 0
-        self.origin_offset = np.array([0, 0], dtype=globvar.POINT_NP_DTYPE)
+
+        self.em_origin = globvar.empty_offset.copy()
+
+        self.origin_offset = globvar.empty_offset.copy()
         self.scale = 1
+
+        self.fill = FILL.ADD
 
         globvar.contours.append(self)
         return
@@ -29,6 +42,11 @@ class Contour(object):
         globvar.contours.pop(index)
         return
 
+    def copy(self):
+        clone = copy.deepcopy(self)
+        globvar.contours.append(clone)
+        return clone
+
     """
     Move the Contour by some offset
     """
@@ -38,14 +56,26 @@ class Contour(object):
             curve.set_offset(self.origin_offset)
         return
 
-    def set_global_offset(self, offset_x, offset_y):
-        for curve in self.curves:
-            curve.set_offset(self.origin_offset + np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE))
+    # def set_global_offset(self, offset_x, offset_y):
+    #     for curve in self.curves:
+    #         curve.set_offset(self.origin_offset + np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE))
 
     def set_scale(self, scale):
         self.scale = scale
         for curve in self.curves:
             curve.set_scale(self.scale)
+        return
+
+    def em_offset(self, offset_x, offset_y):
+        offset = np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE)
+        for curve in self.curves:
+            curve.em_offset(offset)
+        return
+
+    def em_scale(self, scale):
+        for curve in self.curves:
+            curve.em_scale(scale)
+
         return
 
     def append_curve(self, curve):
@@ -69,6 +99,24 @@ class Contour(object):
         for curve in self.curves:
             string += str(np.round(curve.true_points, 3)) + "\n"
         return string
+
+    def get_upper_left(self):
+        min_left = math.inf
+        min_up = math.inf
+        for curve in self.curves:
+            up_left = curve.get_upper_left()
+            min_left = min(min_left, up_left[0])
+            min_up = min(min_up, up_left[1])
+        return np.array([min_left, min_up], dtype=globvar.POINT_NP_DTYPE)
+
+    def get_lower_right(self):
+        max_right = -math.inf
+        max_down = -math.inf
+        for curve in self.curves:
+            down_right = curve.get_lower_right()
+            max_right = max(max_right, down_right[0])
+            max_down = max(max_down, down_right[1])
+        return np.array([max_right, max_down], dtype=globvar.POINT_NP_DTYPE)
 
     """
     Check that each curve is connected to the following
@@ -102,7 +150,7 @@ class Contour(object):
             position_sum += np.sum(curve.tween_points, axis=0)
         return position_sum / self.num_points
 
-    def get_curve_center_relative_angles(self):
+    def update_curve_center_relative_angles(self):
         center = self.get_center()
         for curve in self.curves:
             # offset the curve's center to "(0, 0)" by subtracting 'center'
@@ -111,16 +159,19 @@ class Contour(object):
             cur_curve_rel_angle = np.arctan(adjusted_point[1] / adjusted_point[0]) * 180 / np.pi
             curve.current_contour_relative_angle = cur_curve_rel_angle
             # print("rel angle:", cur_curve_rel_angle)
+        return
 
 # Drawing
-    def draw(self, surface, radius, color_gradient=True):
+    def draw(self, surface, radius, color_gradient=True, width=1):
+        # draw curves in colors corresponding to their order in this contour
         for i, curve in enumerate(self.curves):
             if color_gradient:
                 input_colors = [custom_colors.LT_GRAY,
                                 custom_colors.mix_color(custom_colors.GREEN, custom_colors.RED, (i+1)/(len(self)+1)),
                                 custom_colors.GRAY]
-            curve.draw(surface, radius, input_colors)
+            curve.draw(surface, radius, input_colors, width=width)
 
+        # draw debug information (center, etc.)
         if globvar.DEBUG:
             center = self.get_center()
             debug_alpha = 0.3
@@ -128,13 +179,29 @@ class Contour(object):
             s.set_alpha(np.floor(debug_alpha * 255))  # alpha level
             s.fill(custom_colors.RED)
             surface.blit(s, center - radius)
+
+            pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left(), radius)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right(), radius)
         return
 
+    def draw_filled_polygon(self, surface, fill_color, width=1):
+        # get all of the points of this contour's lines
+        all_tween_points = []
+        for curve in self.curves:
+            for tween_point in curve.tween_points:
+                all_tween_points.append(tween_point)
 
-def interpolate_np(ndarr1, ndarr2, t):
-    weighted_1 = ndarr1 * t
-    weighted_2 = ndarr2 * (1-t)
-    return weighted_1 + weighted_2
+        fill_flag = self.fill
+        if self.fill == FILL.ADD:
+            fill_flag = 0
+        if self.fill == FILL.SUBTRACT:
+            fill_flag = 0
+            fill_color = custom_colors.WHITE
+        if self.fill == FILL.OUTLINE:
+            fill_flag = width
+
+        contour_bounding_box = pygame.draw.polygon(surface, fill_color, all_tween_points, width=round(fill_flag))
+        return contour_bounding_box
 
 
 def calc_score(curve1, curve2):
@@ -153,7 +220,7 @@ def calc_score(curve1, curve2):
     return score
 
 
-def calc_score_MSE(curve1, curve2):
+def calc_curve_score_MSE(curve1, curve2):
     if len(curve1.tween_points) != len(curve2.tween_points):
         raise ValueError("Tried to calculate score of curves with different numbers of points")
     # Offset the given points so that they're centered
@@ -173,20 +240,17 @@ in the form [indices of c1 to take, offset of c2 to use]
 def find_ofer_min_mapping(contour1, contour2):
     # make the contour1 variable hold the larger of the two
     if len(contour2) > len(contour1):
-        raise AttributeError("Contour 1 needs to have at least as many curves as Contour 2")
-        # temp = contour1
-        # contour1 = contour2
-        # contour2 = temp
-    c1_closure = contour1.is_closed()
-    c2_closure = contour2.is_closed()
-    if not (c1_closure and c2_closure):
-        raise AttributeError("Both contours must be closed to find an OferMin Mapping, "
-                             "but: \n  ->C1's closure was " + str(c1_closure) + ", and C2's closure was " + str(c2_closure))
+        temp = contour1
+        contour1 = contour2
+        contour2 = temp
+
+    # if len(contour2) > len(contour1):
+    #     raise AttributeError("Contour 1 needs to have at least as many curves as Contour 2")
 
     n1 = len(contour1)
     n2 = len(contour2)
-    contour1.get_curve_center_relative_angles()
-    contour2.get_curve_center_relative_angles()
+    contour1.update_curve_center_relative_angles()
+    contour2.update_curve_center_relative_angles()
 
     best_score = -math.inf
     best_mapping = None
@@ -208,12 +272,12 @@ def find_ofer_min_mapping(contour1, contour2):
             for c1_index, c2_index in zip(indices, range_n2):
                 c1_curve = contour1.curves[c1_index]
                 c2_curve = contour2.curves[(c2_index + offset) % n2]
-                current_mapping_score += calc_score_MSE(c1_curve, c2_curve)
+                current_mapping_score += calc_curve_score_MSE(c1_curve, c2_curve)
 
             if current_mapping_score > best_score:
                 best_score = current_mapping_score
                 best_mapping = [indices, offset]
-    return best_mapping
+    return best_mapping, best_score
 
 
 """
@@ -225,8 +289,6 @@ given in the mapping should be mapped to "zero curves" in c2.
 
 def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
     lerped_contour = Contour()
-    n1 = len(contour1)
-    n2 = len(contour2)
 
     # we know we need n1 curves in total
     # we also know which indices of c1 were chosen
@@ -234,7 +296,17 @@ def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
     # we fill with a "zero curve"
 
     c1_chosen_curves, c2_offset = mapping
-    expected_index = 0
+
+    # make the same switch as the mapping did; from here, everything should be the same
+    if len(contour2) > len(contour1):
+        temp = contour1
+        contour1 = contour2
+        contour2 = temp
+        t = 1-t
+
+    n1 = len(contour1)
+    n2 = len(contour2)
+
     current_c2_index = 0
     last_endpoint = contour2.curves[current_c2_index + c2_offset].true_points[0]
     if debug_info:
@@ -249,7 +321,7 @@ def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
             circular_c2_index = (current_c2_index + c2_offset) % n2
             # now add the curve you've been trying to give me (we're all caught up to the expected index)
             # by interpolating between the current c2 curve and the corresponding c1 curve
-            lerped_points = interpolate_np(contour1.curves[expected_index].true_points,
+            lerped_points = custom_math.interpolate_np(contour1.curves[expected_index].true_points,
                                            contour2.curves[circular_c2_index].true_points,
                                            t)
             last_endpoint = contour2.curves[circular_c2_index].true_points[-1]
@@ -260,7 +332,7 @@ def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
                 print("adding curve #", expected_index, ", a mapping between a null curve and C1's", expected_index)
             # interpolate between the current c1_curve and the "zero curve" which
             # consists of four points bunched together at c2's last point
-            lerped_zero_curve_points = interpolate_np(
+            lerped_zero_curve_points = custom_math.interpolate_np(
                 contour1.curves[expected_index].true_points,
                 np.array([last_endpoint, last_endpoint, last_endpoint, last_endpoint]),
                 t)
@@ -268,7 +340,8 @@ def lerp_contours_OMin(contour1, contour2, mapping, t, debug_info=False):
 
     return lerped_contour
 
-def map_and_lerp(contour1, contour2, lerp_weight, mapping_function, lerping_function):
-    mapping = mapping_function(contour1, contour2)
-    lerped_contour = lerping_function(contour1, contour2, mapping, lerp_weight)
-    return lerped_contour
+# TODO fix or remove
+# def map_and_lerp(contour1, contour2, lerp_weight, mapping_function, lerping_function):
+#     mapping, mapping_score, switched = mapping_function(contour1, contour2)
+#     lerped_contour = lerping_function(contour1, contour2, mapping, lerp_weight)
+#     return lerped_contour

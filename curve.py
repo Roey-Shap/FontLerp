@@ -58,6 +58,11 @@ class Curve(object):
         globvar.curves.pop(index)
         return
 
+    def copy(self):
+        clone = copy.deepcopy(self)
+        globvar.curves.append(clone)
+        return clone
+
     def set_offset(self, origin_offset):
         # offset the current points (4x2)
         self.origin_offset = origin_offset
@@ -68,6 +73,18 @@ class Curve(object):
 
     def set_scale(self, scale):
         self.scale = scale
+        self.update_points(self.true_points)
+        return
+
+    # offset true points around (so different curves and contours can have different offsets from their parent glyph)
+    def em_offset(self, offset):
+        self.true_points += offset
+        self.update_points(self.true_points)
+        return
+
+    # scale true points
+    def em_scale(self, scale):
+        self.true_points *= scale
         self.update_points(self.true_points)
         return
 
@@ -259,13 +276,13 @@ class Bezier(Curve):
         return
 
 # Drawing
-    def draw(self, surface, point_radius, input_colors=None):
+    def draw(self, surface, point_radius, input_colors=None, width=1):
         colors = [custom_colors.LT_GRAY, custom_colors.BLACK, custom_colors.BLUE]
         if input_colors is not None:
             colors = input_colors
-        self.draw_tween_lines(surface, colors[1])
+        self.draw_tween_lines(surface, colors[1], width=width)
         if globvar.DEBUG:
-            self.draw_control_lines(surface, colors[0])
+            self.draw_control_lines(surface, colors[0], width=width)
             self.draw_control_points(surface, colors[2], radius=point_radius)
     """
     Draws the lines connected the precomputed "render points
@@ -277,16 +294,17 @@ class Bezier(Curve):
         for i in range(num_render_points-1):
             p1 = p2
             p2 = self.tween_points[i+1]
-            pygame.draw.line(surface, color, p1, p2)
+            pygame.draw.line(surface, color, p1, p2, width=width)
 
         return
 
     """
     Draw the lines from the control points to show how they influence the Bezier's curvature
     """
-    def draw_control_lines(self, surface, color):
-        pygame.draw.line(surface, color, self.points[0], self.points[1])
-        pygame.draw.line(surface, color, self.points[-2], self.points[-1])
+    def draw_control_lines(self, surface, color, width=1):
+        width = round(width/3)
+        pygame.draw.line(surface, color, self.points[0], self.points[1], width=width)
+        pygame.draw.line(surface, color, self.points[-2], self.points[-1], width=width)
         return
 
     """

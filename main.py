@@ -8,6 +8,7 @@ import sys
 import time
 import numpy as np
 import custom_math
+import copy
 
 import global_variables as globvar
 import toolbar
@@ -35,6 +36,8 @@ globvar.t_values = np.array([[(i/globvar.bezier_accuracy)**3,
                               (i/globvar.bezier_accuracy), 1] for i in range(globvar.bezier_accuracy+1)], dtype=globvar.POINT_NP_DTYPE)
 # print(globvar.t_values)
 
+
+line_width = 3
 w, h = globvar.SCREEN_DIMENSIONS
 
 base_scale = 75
@@ -82,6 +85,8 @@ circle_a4 = np.array([[-1, 1],
                       [-circle_const, 0],
                       [0, 0]])
 
+
+
 cont = contour.Contour()
 cont.append_curves_from_np([c1, c2, c3, c4, c5, c6])
 cont.set_offset(4, 1.5)
@@ -92,8 +97,35 @@ circle.append_curves_from_np([circle_a1, circle_a2, circle_a3, circle_a4])
 circle.set_offset(4, 3.5)
 circle.set_scale(base_scale)
 
-mixed_contour = None
-mapping = contour.find_ofer_min_mapping(cont, circle)
+circle_mini = circle.copy()
+circle_mini.fill=contour.FILL.SUBTRACT
+circle_mini.em_scale(0.7)
+circle_mini.em_offset(0.05, 0.25)
+
+circle_mini2 = circle_mini.copy()
+circle_mini2.fill = contour.FILL.ADD
+circle_mini2.em_scale(0.3)
+circle_mini2.em_offset(0, -1)
+circle_mini2.set_offset(4, 1.6)
+
+
+glyph_O = glyph.Glyph()
+glyph_O.append_contours_multi([circle, circle_mini])
+glyph_O.update_bounding_points()
+
+
+glyph_test = glyph.Glyph()
+glyph_test.append_contours_multi([circle_mini2, cont])
+glyph_test.update_bounding_points()
+
+# mixed_contour = None
+# mapping, mapping_score = contour.find_ofer_min_mapping(cont, circle)
+
+mixed_glyph = None
+mappings, glyph_score = glyph.find_glyph_null_contour_mapping(glyph_O, glyph_test)
+print("!!", mappings)
+print("!!!!", glyph_score)
+# mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, 0)
 
 # Execution loop
 running = True
@@ -139,17 +171,20 @@ while running:
 
 
     # Reset the mixed contour on display
-    if mixed_contour is not None:
-        mixed_contour.destroy()
-        mixed_contour = None
+    if mixed_glyph is not None:
+        mixed_glyph.destroy()
+        mixed_glyph = None
 
-        mapping = contour.find_ofer_min_mapping(cont, circle)
+        mappings, score = glyph.find_glyph_null_contour_mapping(glyph_O, glyph_test)
 
 
-    # Remix the contour
+
+
+    # Remix the glyph
     mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-    mixed_contour = contour.lerp_contours_OMin(cont, circle, mapping, mix_t)
-    mixed_contour.set_offset(6, 2.5)
+    mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, mix_t)
+    mixed_glyph.set_offset(6, 2.5)
+
 
     # update Bezier curves in response to any points which changed
     for curve in globvar.curves:
@@ -165,9 +200,23 @@ while running:
 # Rendering
     screen.fill(colors.WHITE)
 
-    cont.draw(screen, point_radius, color_gradient=True)
-    circle.draw(screen, point_radius, color_gradient=True)
-    mixed_contour.draw(screen, point_radius, color_gradient=True)
+    mixed_glyph.draw(screen, point_radius, [0, 0])
+    cont.draw_filled_polygon(screen, colors.RED)
+    cont.draw(screen, point_radius, color_gradient=True, width=line_width)
+    circle_mini2.draw_filled_polygon(screen, colors.BLUE)
+    circle_mini2.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # glyph_O.draw(screen, point_radius, [0, 0])
+    # glyph_test.draw(screen, point_radius, [w/2, 0])
+    # circle.draw_filled_polygon(screen, colors.BLUE)
+    # circle_mini.draw_filled_polygon(screen, colors.BLUE)
+    # circle.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # circle_mini.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # gray_value = 0.8 * 255
+    # fill_color = (gray_value, gray_value, gray_value)
+    # cont.draw_filled_polygon(screen, fill_color)
+    # cont.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # circle.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # mixed_contour.draw(screen, point_radius, color_gradient=True, width=line_width)
     # for c in globvar.contours:
     #     c.draw(screen, point_radius)
 
@@ -183,7 +232,7 @@ while running:
 
         debug_messages = ["Framerate: " + str(round(clock.get_fps(), 4)),
                           "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
-                          "Mapping: " + str(mapping)]
+                          "Mapping: " + str(mappings)]
         for i, message in enumerate(debug_messages):
             text_rect = pygame.Rect(0, 0, w/4, h)
             debug_text_surface = fonts.multiLineSurface(message, fonts.FONT_DEBUG, text_rect, colors.BLACK)
