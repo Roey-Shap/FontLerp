@@ -14,7 +14,6 @@ class Glyph(object):
         self.contours = []
 
         self.em_origin = globvar.empty_offset.copy()
-        self.em_scale = 1
 
         self.origin_offset = globvar.empty_offset.copy()
         self.scale = 1
@@ -93,7 +92,7 @@ class Glyph(object):
         # define a surface on which the contours can draw their fills
         bounding_box = self.get_bounding_box()
         factor = 0.2
-        glyph_surface = pygame.Surface(globvar.SCREEN_DIMENSIONS)
+        glyph_surface = pygame.Surface(globvar.SCREEN_DIMENSIONS*(1+factor))
         # glyph_surface = pygame.Surface((bounding_box.width * (1+factor), bounding_box.height * (1+factor)))
         glyph_surface.fill(custom_colors.WHITE)
 

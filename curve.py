@@ -251,7 +251,8 @@ class Bezier(Curve):
         return np.matmul(self.bernstein_points, ts)
 
     def calc_tween_points(self):
-        self.tween_points = np.matmul(self.bernstein_points, globvar.t_values.T).T
+        size_adj = 0 if self.num_points == 4 else 1
+        self.tween_points = np.matmul(self.bernstein_points, globvar.t_values[:, size_adj:4].T).T
         return
         # self.render_points = np.zeros((accuracy, 2))
         # self.render_points = []

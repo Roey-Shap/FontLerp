@@ -14,6 +14,7 @@ import global_variables as globvar
 import toolbar
 import custom_colors as colors
 import fonts
+import ttfConverter
 
 import pygame
 import curve
@@ -34,13 +35,34 @@ toolbar = toolbar.Toolbar()
 globvar.t_values = np.array([[(i/globvar.bezier_accuracy)**3,
                               (i/globvar.bezier_accuracy)**2,
                               (i/globvar.bezier_accuracy), 1] for i in range(globvar.bezier_accuracy+1)], dtype=globvar.POINT_NP_DTYPE)
-# print(globvar.t_values)
-
 
 line_width = 3
 w, h = globvar.SCREEN_DIMENSIONS
 
 base_scale = 75
+
+
+
+extracted_h_data = ttfConverter.test_font_load("h")
+extracted_i_data = ttfConverter.test_font_load("i")
+test_h = glyph.Glyph()
+test_i = glyph.Glyph()
+for cnt in extracted_h_data:
+    test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+test_h.em_scale(0.1)
+test_h.set_offset(0, h/2)
+
+for cnt in extracted_i_data:
+    test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+test_i.em_scale(0.1)
+test_i.set_offset(0, h/2)
+
+
+if len(test_h) == 2:
+    test_h.contours[-1].fill=contour.FILL.SUBTRACT
+
+print("# Contours:", len(test_h))
+
 
 circle_const = 0.5522847
 c1 = np.array([[0, 0],
@@ -86,7 +108,6 @@ circle_a4 = np.array([[-1, 1],
                       [0, 0]])
 
 
-
 cont = contour.Contour()
 cont.append_curves_from_np([c1, c2, c3, c4, c5, c6])
 cont.set_offset(4, 1.5)
@@ -123,8 +144,10 @@ glyph_test.update_bounding_points()
 
 mixed_glyph = None
 mappings, glyph_score = glyph.find_glyph_null_contour_mapping(glyph_O, glyph_test)
-print("!!", mappings)
-print("!!!!", glyph_score)
+
+test_cont = contour.Contour()
+test_cont.append_curves_from_np([c6[0:3]])
+
 # mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, 0)
 
 # Execution loop
@@ -181,9 +204,9 @@ while running:
 
 
     # Remix the glyph
-    mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-    mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, mix_t)
-    mixed_glyph.set_offset(6, 2.5)
+    # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
+    # mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, mix_t)
+    # mixed_glyph.set_offset(6, 2.5)
 
 
     # update Bezier curves in response to any points which changed
@@ -193,18 +216,26 @@ while running:
         curve.step()
 
     # Update zoom scale
-    for c in globvar.contours:
-        c.set_scale(globvar.global_scale * base_scale)
+    # for c in globvar.contours:
+    #     c.set_scale(globvar.global_scale * base_scale) <---------------- Important! TODO
 
 
 # Rendering
     screen.fill(colors.WHITE)
 
-    mixed_glyph.draw(screen, point_radius, [0, 0])
-    cont.draw_filled_polygon(screen, colors.RED)
-    cont.draw(screen, point_radius, color_gradient=True, width=line_width)
-    circle_mini2.draw_filled_polygon(screen, colors.BLUE)
-    circle_mini2.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # mixed_glyph.draw(screen, point_radius, [0, 0])
+    # cont.draw_filled_polygon(screen, colors.RED)
+    # cont.draw(screen, point_radius, color_gradient=True, width=line_width)
+    # circle_mini2.draw_filled_polygon(screen, colors.BLUE)
+    # circle_mini2.draw(screen, point_radius, color_gradient=True, width=line_width)
+
+    test_h.draw(screen, point_radius, [w/4, h/4])
+    test_i.draw(screen, point_radius, [w / 2, h / 4])
+    # test_contour.draw(screen, point_radius, color_gradient=True, width=line_width)
+
+    # test_cont.set_offset(3, 3)ou
+    # test_cont.set_scale(globvar.global_scale * base_scale)
+
     # glyph_O.draw(screen, point_radius, [0, 0])
     # glyph_test.draw(screen, point_radius, [w/2, 0])
     # circle.draw_filled_polygon(screen, colors.BLUE)
