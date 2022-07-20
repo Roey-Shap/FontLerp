@@ -1,13 +1,21 @@
 import pygame
 import global_variables as globvar
 import custom_colors
+import numpy as np
 
 class Cursor(object):
+    class Mode(int):
+        NORMAL = 0
+        PAN = 1
+
     def __init__(self):
         self.x = 0
         self.y = 0
         self.x_prev = 0
         self.y_prev = 0
+
+        self.panning = False
+
         self.x_select_start = 0
         self.y_select_start = 0
         self.multiselecting = False
@@ -19,6 +27,9 @@ class Cursor(object):
         return
 
     def update_mouse_variables(self):
+        self.x_prev = self.x
+        self.y_prev = self.y
+
         self.mouse_pos = globvar.mouse_pos
         self.mouse_click = globvar.mouse_click
         self.mouse_held = globvar.mouse_held
@@ -27,7 +38,35 @@ class Cursor(object):
         self.x = self.mouse_pos[0]
         self.y = self.mouse_pos[1]
 
+        # keep pressing and mode separate - might want to toggle mode later
+        self.panning = globvar.KEY_SPACE_PRESSED
+
+    def screen_to_world_space(self, screen_pos):
+        screen_pos = np.array(screen_pos, dtype=globvar.POINT_NP_DTYPE)
+        return (screen_pos / globvar.CAMERA_ZOOM) + globvar.CAMERA_OFFSET
+
+    def world_to_screen_space(self, world_pos):
+        world_pos = np.array(world_pos, dtype=globvar.POINT_NP_DTYPE)
+        return (world_pos - globvar.CAMERA_OFFSET) * globvar.CAMERA_ZOOM
+
     def step(self, point_radius):
+        # Update zoom and panning
+        y_scroll = globvar.mouse_scroll_directions[1]
+        if y_scroll:
+            prev_mouse_world_position = self.screen_to_world_space(self.mouse_pos)
+            globvar.CAMERA_ZOOM += y_scroll * globvar.SCROLL_DELTA
+            post_mouse_world_position = self.screen_to_world_space(self.mouse_pos)
+
+            delta_mouse_pos = prev_mouse_world_position - post_mouse_world_position
+            globvar.CAMERA_OFFSET += delta_mouse_pos
+
+        self.step_normal_mode(point_radius)
+
+        if self.panning:
+            self.step_pan_mode()
+        return
+
+    def step_normal_mode(self, point_radius):
         if not self.mouse_held:
             self.multiselecting = False
 
@@ -74,6 +113,19 @@ class Cursor(object):
             self.y_select_start = self.y
 
         globvar.hovered_point = hovered_point
+        return
+
+    def step_pan_mode(self):
+        print("Panning!")
+
+        # find the difference in the mouse's position and the current to determine
+        # how far in world space we've moved
+
+        delta_x = self.x - self.x_prev
+        delta_y = self.y - self.y_prev
+
+        globvar.CAMERA_OFFSET[0] -= delta_x / globvar.CAMERA_ZOOM
+        globvar.CAMERA_OFFSET[1] -= delta_y / globvar.CAMERA_ZOOM
         return
 
     def draw(self, surface):

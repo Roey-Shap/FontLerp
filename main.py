@@ -37,15 +37,45 @@ globvar.t_values = np.array([[(i/globvar.bezier_accuracy)**3,
                               (i/globvar.bezier_accuracy), 1] for i in range(globvar.bezier_accuracy+1)], dtype=globvar.POINT_NP_DTYPE)
 
 line_width = 3
+base_scale = 1
+
 w, h = globvar.SCREEN_DIMENSIONS
 
-base_scale = 75
+
+# create default glyph bounding box
+glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS)
 
 
 
 
 extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
 extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
+
+
+test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
+test_glyphs = []
+
+for i, font in enumerate(test_fonts):
+    g = glyph.Glyph()
+    test_glyphs.append(g)
+    contours = ttfConverter.test_font_load("A", font)
+    num_curves = 0
+    for c in contours:
+        contour_object = ttfConverter.convert_quadratic_flagged_points_to_contour(c)
+        g.append_contour(contour_object)
+        num_curves += len(contour_object)
+        print(c)
+    g.set_offset(w * ((i+1)/5), h/2)
+    g.update_bounding_points()
+
+    print("Made glyph with upper left:", g.upper_left, "and lower right", g.lower_right)
+    r = g.lower_right - g.upper_left
+    print("... and thus width:", r[0], "and height:", r[1])
+    print("Glyph has", num_curves, "curves")
+    print("")
+
+
+
 test_h = glyph.Glyph()
 test_i = glyph.Glyph()
 for cnt in extracted_h1_data:
@@ -66,10 +96,8 @@ test_i.set_offset(0, h/2)
 if len(test_h) == 2:
     test_h.contours[-1].fill=contour.FILL.SUBTRACT
 
-print("# Contours:", len(test_h))
 
-
-circle_const = 0.5522847
+circle_const = globvar.CIRCLE_CONST
 c1 = np.array([[0, 0],
                [0.1, 0.1],
                [0.2, 0.2],
@@ -144,17 +172,15 @@ glyph_test = glyph.Glyph()
 glyph_test.append_contours_multi([circle_mini2, cont])
 glyph_test.update_bounding_points()
 
-# mixed_contour = None
-# mapping, mapping_score = contour.find_ofer_min_mapping(cont, circle)
 
 mixed_glyph = None
 mappings = None
-mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
+# mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
 
-# test_cont = contour.Contour()
-# test_cont.append_curves_from_np([c6[0:3]])
 
-mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
+# mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
+
+not_scrolling = True
 
 # Execution loop
 running = True
@@ -166,15 +192,22 @@ while running:
     clock.tick(globvar.FPS)
 
     globvar.mouse_scroll_directions = globvar.empty_offset
+    prev_scale = globvar.CAMERA_ZOOM
+    last_not_scrolling = not_scrolling
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                globvar.DEBUG = not globvar.DEBUG
+                globvar.KEY_SPACE_PRESSED = True
+                # globvar.DEBUG = not globvar.DEBUG
             if event.key == pygame.K_r:
-                mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
+                print("Mapping disabled. Come uncomment this if you want a mapping.")
+                # mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_SPACE:
+                globvar.KEY_SPACE_PRESSED = False
         elif event.type == pygame.MOUSEWHEEL:
             globvar.mouse_scroll_directions = np.array([event.x, event.y])
 
@@ -192,13 +225,13 @@ while running:
     globvar.mouse_held = mouse_held
     globvar.mouse_click_left = mouse_click_left
 
+    not_scrolling = np.all(np.isclose(globvar.mouse_scroll_directions, globvar.empty_offset))
+    just_stopped_scrolling = not_scrolling and not last_not_scrolling
+
     # synchronize Cursor object with inputs
     cursor.update_mouse_variables()
     cursor.step(point_radius)
 
-
-    # Update zoom and panning
-    globvar.global_scale += mouse_scroll_directions * globvar.scroll_delta
 
 
     # Reset the mixed contour on display
@@ -212,9 +245,9 @@ while running:
 
 
     # Remix the glyph
-    mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-    mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, mix_t)
-    mixed_glyph.set_offset(0, h/2)
+    # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
+    # mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, mix_t)
+    # mixed_glyph.set_offset(0, h/2)
 
 
 
@@ -225,12 +258,26 @@ while running:
         curve.step()
 
     # Update zoom scale
-    # for c in globvar.contours:
-    #     c.set_scale(globvar.global_scale * base_scale) <---------------- Important! TODO
+    # for g in globvar.glyphs:
+    #     g.em_scale(globvar.GLOBAL_SCALE * base_scale)
+    if just_stopped_scrolling:
+        test_glyphs[0].set_scale(globvar.CAMERA_ZOOM * base_scale)
 
+    offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
+    glyph_box = pygame.Rect(offset_corner * globvar.CAMERA_ZOOM,
+                            globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS * globvar.CAMERA_ZOOM)
 
-# Rendering
+    # Rendering
     screen.fill(colors.WHITE)
+
+    # Left glyph unit boundaries
+    border_width = 1
+    corner_rad = 3
+    pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
+
+    test_glyphs[0].draw(screen, point_radius, [0, 0])
+    # for g in test_glyphs:
+    #     g.draw(screen, point_radius, [0, 0])
 
     # mixed_glyph.draw(screen, point_radius, [0, 0])
     # cont.draw_filled_polygon(screen, colors.RED)
@@ -240,30 +287,16 @@ while running:
 
     # test_h.draw(screen, point_radius, [w/4, h/4])
     # test_i.draw(screen, point_radius, [w / 2, h / 4])
-    mixed_glyph.draw(screen, point_radius, [w/4, h/4])
+    # mixed_glyph.draw(screen, point_radius, [w/4, h/4])
 
 
     # test_contour.draw(screen, point_radius, color_gradient=True, width=line_width)
 
-    # test_cont.set_offset(3, 3)ou
-    # test_cont.set_scale(globvar.global_scale * base_scale)
-
-    # glyph_O.draw(screen, point_radius, [0, 0])
-    # glyph_test.draw(screen, point_radius, [w/2, 0])
-    # circle.draw_filled_polygon(screen, colors.BLUE)
-    # circle_mini.draw_filled_polygon(screen, colors.BLUE)
-    # circle.draw(screen, point_radius, color_gradient=True, width=line_width)
-    # circle_mini.draw(screen, point_radius, color_gradient=True, width=line_width)
-    # gray_value = 0.8 * 255
-    # fill_color = (gray_value, gray_value, gray_value)
-    # cont.draw_filled_polygon(screen, fill_color)
-    # cont.draw(screen, point_radius, color_gradient=True, width=line_width)
-    # circle.draw(screen, point_radius, color_gradient=True, width=line_width)
-    # mixed_contour.draw(screen, point_radius, color_gradient=True, width=line_width)
     # for c in globvar.contours:
     #     c.draw(screen, point_radius)
 
-    # UI drawing
+
+    # GUI drawing
     cursor.draw(screen)
     toolbar.draw(screen)
 
@@ -273,8 +306,11 @@ while running:
         pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
         pygame.draw.circle(screen, colors.RED, origin, 5)
 
-        debug_messages = ["Press 'R' to pick a new random mapping",
+        debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
+                          "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
                           "Framerate: " + str(round(clock.get_fps(), 4)),
+                          "Mouse position: " + str(mouse_pos),
+                          "Mouse position in world: " + str(cursor.screen_to_world_space(mouse_pos)),
                           "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
                           "Mapping: " + str(mappings)]
         for i, message in enumerate(debug_messages):

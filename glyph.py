@@ -103,9 +103,9 @@ class Glyph(object):
         # define a surface on which the contours can draw their fills
         bounding_box = self.get_bounding_box()
         factor = 0.2
-        glyph_surface = pygame.Surface(globvar.SCREEN_DIMENSIONS*(1+factor))
+        # glyph_surface = pygame.Surface(globvar.SCREEN_DIMENSIONS*(1+factor))
         # glyph_surface = pygame.Surface((bounding_box.width * (1+factor), bounding_box.height * (1+factor)))
-        glyph_surface.fill(custom_colors.WHITE)
+        # glyph_surface.fill(custom_colors.WHITE)
 
         # first let them draw their respective fills
         gray_value = 0.8 * 255
@@ -114,15 +114,15 @@ class Glyph(object):
             # TODO when refactoring to make the surface the size of the bounding box, either:
             # 1) pass an offset all the way down , -self.upper_left (kinda ugly and unmaintainable?)
             # 2) find a different way to make sure the curves draw onto this surface
-            contour.draw_filled_polygon(glyph_surface, fill_color, width=width)
+            contour.draw_filled_polygon(surface, fill_color, width=width)
 
         # then let them draw their respective outlines
         for contour in self.contours:
-            contour.draw(glyph_surface, radius, color_gradient, width=width)
+            contour.draw(surface, radius, color_gradient, width=width)
 
         # adj_corner = [self.upper_left[0] - (bounding_box.width * factor/2), self.upper_left[1] - (bounding_box.height * factor/2)]
         # surface.blit(glyph_surface, adj_corner)
-        surface.blit(glyph_surface, position)
+        # surface.blit(surface, position)
         return
 
 def calc_contour_score_MSE(contour1, contour2):

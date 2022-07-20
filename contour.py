@@ -83,7 +83,8 @@ class Contour(object):
         return
 
     def em_scale(self, scale):
-        for curve in self.curves:
+        for i, curve in enumerate(self.curves):
+            print("Updating", i)
             curve.em_scale(scale)
 
         return
