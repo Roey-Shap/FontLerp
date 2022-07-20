@@ -43,16 +43,21 @@ base_scale = 75
 
 
 
-extracted_h_data = ttfConverter.test_font_load("h")
-extracted_i_data = ttfConverter.test_font_load("i")
+
+extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
+extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
 test_h = glyph.Glyph()
 test_i = glyph.Glyph()
-for cnt in extracted_h_data:
+for cnt in extracted_h1_data:
     test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
-test_h.em_scale(0.1)
+# test_h.prune_curves()
+test_h.em_scale(0.07)
 test_h.set_offset(0, h/2)
 
-for cnt in extracted_i_data:
+# test_i = test_h.copy()
+# test_i.em_scale(0.8)
+
+for cnt in extracted_h2_data:
     test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
 test_i.em_scale(0.1)
 test_i.set_offset(0, h/2)
@@ -143,12 +148,13 @@ glyph_test.update_bounding_points()
 # mapping, mapping_score = contour.find_ofer_min_mapping(cont, circle)
 
 mixed_glyph = None
-mappings, glyph_score = glyph.find_glyph_null_contour_mapping(glyph_O, glyph_test)
+mappings = None
+mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
 
-test_cont = contour.Contour()
-test_cont.append_curves_from_np([c6[0:3]])
+# test_cont = contour.Contour()
+# test_cont.append_curves_from_np([c6[0:3]])
 
-# mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, 0)
+mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
 
 # Execution loop
 running = True
@@ -167,6 +173,8 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 globvar.DEBUG = not globvar.DEBUG
+            if event.key == pygame.K_r:
+                mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
         elif event.type == pygame.MOUSEWHEEL:
             globvar.mouse_scroll_directions = np.array([event.x, event.y])
 
@@ -198,15 +206,16 @@ while running:
         mixed_glyph.destroy()
         mixed_glyph = None
 
-        mappings, score = glyph.find_glyph_null_contour_mapping(glyph_O, glyph_test)
+        # mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
 
 
 
 
     # Remix the glyph
-    # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-    # mixed_glyph = glyph.lerp_glyphs(glyph_O, glyph_test, mappings, mix_t)
-    # mixed_glyph.set_offset(6, 2.5)
+    mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
+    mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, mix_t)
+    mixed_glyph.set_offset(0, h/2)
+
 
 
     # update Bezier curves in response to any points which changed
@@ -229,8 +238,11 @@ while running:
     # circle_mini2.draw_filled_polygon(screen, colors.BLUE)
     # circle_mini2.draw(screen, point_radius, color_gradient=True, width=line_width)
 
-    test_h.draw(screen, point_radius, [w/4, h/4])
-    test_i.draw(screen, point_radius, [w / 2, h / 4])
+    # test_h.draw(screen, point_radius, [w/4, h/4])
+    # test_i.draw(screen, point_radius, [w / 2, h / 4])
+    mixed_glyph.draw(screen, point_radius, [w/4, h/4])
+
+
     # test_contour.draw(screen, point_radius, color_gradient=True, width=line_width)
 
     # test_cont.set_offset(3, 3)ou
@@ -261,7 +273,8 @@ while running:
         pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
         pygame.draw.circle(screen, colors.RED, origin, 5)
 
-        debug_messages = ["Framerate: " + str(round(clock.get_fps(), 4)),
+        debug_messages = ["Press 'R' to pick a new random mapping",
+                          "Framerate: " + str(round(clock.get_fps(), 4)),
                           "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
                           "Mapping: " + str(mappings)]
         for i, message in enumerate(debug_messages):

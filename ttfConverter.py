@@ -9,10 +9,10 @@ import contour
 import numpy as np
 import global_variables as globvar
 
-def test_font_load(char):
+def test_font_load(char, ttf_file_name):
     # print("Font import information")
 
-    font_url = "Test_Fonts/OpenSans-Light.ttf"
+    font_url = "Test_Fonts/" + ttf_file_name
     font = ttfquery.describe.openFont(font_url)
     g = glyph.Glyph(ttfquery.glyphquery.glyphName(font, char))
     g_contours = g.calculateContours(font)
@@ -84,6 +84,8 @@ def convert_quadratic_flagged_points_to_contour(flagged_points):
         current_coords = flip_y(current_coords)
         current_points.append(current_coords)
         if is_endpoint:
+            if len(current_points) == 4:
+                print("Cubic!")
             if len(current_points) == 2:
                 midway = (0.5*(current_points[0][0] + current_points[1][0]), 0.5*(current_points[0][1] + current_points[1][1]))
                 current_points = [current_points[0], midway, current_points[1]]

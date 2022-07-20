@@ -264,10 +264,10 @@ class Bezier(Curve):
 
     def get_length(self):
         sigma = 0
-        num_render_points = len(self.render_points)
+        num_render_points = len(self.tween_points)
         for i in range(num_render_points-1):
-            p1 = self.render_points[i]
-            p2 = self.render_points[i+1]
+            p1 = self.tween_points[i]
+            p2 = self.tween_points[i+1]
             sigma += np.linalg.norm(p1-p2)
 
         return sigma

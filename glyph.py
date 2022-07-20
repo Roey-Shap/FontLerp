@@ -1,6 +1,7 @@
 import numpy as np
 import pygame
 import math
+import copy
 
 import global_variables as globvar
 import custom_colors
@@ -25,6 +26,11 @@ class Glyph(object):
 
         return
 
+    def copy(self):
+        clone = copy.deepcopy(self)
+        globvar.glyphs.append(clone)
+        return clone
+
     def destroy(self):
         for c in self.contours:
             c.destroy()
@@ -48,6 +54,11 @@ class Glyph(object):
         for c in self.contours:
             if not c.is_closed(): return False
         return True
+
+    def prune_curves(self):
+        for c in self.contours:
+            c.prune_curves()
+        return
 
     def set_offset(self, offset_x, offset_y):
         self.origin_offset = np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE)
@@ -132,9 +143,12 @@ and is of the same fill type (clockwise or CCW).
 That contour will begin as a copy in G2 and become what it is in G1.
 That inherently gives it a mapping.
 """
-def find_glyph_null_contour_mapping(glyph1, glyph2):
+def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
     # ensure that glyph1 has no less contours than glyph2
-    if len(glyph2) > len(glyph1):
+    n1 = len(glyph1)
+    n2 = len(glyph2)
+
+    if n2 > n1:
         raise AttributeError("Glyph 1 needs to have at least as many curves as Glyph 2")
     g1_closure = glyph1.check_all_contours_closed()
     g2_closure = glyph2.check_all_contours_closed()
@@ -144,8 +158,10 @@ def find_glyph_null_contour_mapping(glyph1, glyph2):
                              "but: \n  ->G1's closure was " + str(g1_closure) + ", and G2's closure was " + str(
             g2_closure))
 
-    n1 = len(glyph1)
-    n2 = len(glyph2)
+
+    if debug_info:
+        print("Finding mapping for G1 with", n1, "contours and", str(sum(len(c) for c in glyph1.contours)), "curves")
+        print("            ... and G2 with", n1, "contours and", str(sum(len(c) for c in glyph2    .contours)), "curves")
 
     # TODO implement clockwise/CCW preference in contour mapping
     # pick a mapping of glyph2's contours to glyph1's (any to any)
