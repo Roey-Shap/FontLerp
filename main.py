@@ -155,8 +155,8 @@ circle_size = 100
 circle_g = glyph.Glyph()
 circle_g.append_contour(circle)
 circle_g.worldspace_scale_by(circle_size)
-circle_g.worldspace_offset(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
-circle_g.worldspace_offset(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
+circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
+circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
 
 # circle_mini = circle.copy()
 # circle_mini.fill=contour.FILL.SUBTRACT
@@ -201,7 +201,6 @@ while running:
     globvar.mouse_scroll_directions = globvar.empty_offset
     prev_accuracy = globvar.BEZIER_ACCURACY
     last_not_scrolling = not_scrolling
-
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:

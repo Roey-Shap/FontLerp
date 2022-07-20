@@ -9,7 +9,7 @@ class GlobalManager(object):
     Based on the level of zoom, adjust the accuracy with which Bezier curves are drawn.
     """
     def update_bezier_accuracy(self):
-        globvar.BEZIER_ACCURACY = int(2 * np.log2(globvar.CAMERA_ZOOM * 30)) + 1
+        globvar.BEZIER_ACCURACY = int(2.5 * np.log2(globvar.CAMERA_ZOOM * 30)) + 1
         return
 
     def calculate_t_array(self):

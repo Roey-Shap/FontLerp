@@ -24,5 +24,9 @@ def get_bounding_box_from_radius(x, y, r):
 def camera_to_worldspace(np_array):
     return (np_array / globvar.CAMERA_ZOOM) + globvar.CAMERA_OFFSET
 
+
 def world_to_cameraspace(np_array):
     return (np_array - globvar.CAMERA_OFFSET) * globvar.CAMERA_ZOOM
+
+def clamp(value, min_val, max_val):
+    return max(min_val, min(max_val, value))

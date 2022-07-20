@@ -56,22 +56,19 @@ class Contour(object):
         globvar.contours.append(clone)
         return clone
 
-    def worldspace_offset(self, offset):
+    def worldspace_offset_by(self, offset):
         for curve in self.curves:
             curve.worldspace_offset_by(offset)
         return
 
     def worldspace_scale_by(self, scale):
-        for curve in enumerate(self.curves):
+        for curve in self.curves:
             curve.worldspace_scale_by(scale)
-
         return
 
     def append_curve(self, curve):
         self.curves.append(curve)
         self.num_points += curve.tween_points.shape[0]          # for finding the average later
-        self.upper_left_world = np.min(self.upper_left_world, curve.get_upper_left_world())
-        self.lower_right_world = np.min(self.lower_right_world, curve.get_lower_right_world())
         return
 
     def append_curve_multi(self, curves):
@@ -82,6 +79,16 @@ class Contour(object):
     def append_curves_from_np(self, curves_point_data):
         for curve_data in curves_point_data:
             self.append_curve(curve.Bezier(curve_data))
+        return
+
+
+    def update_bounds(self):
+        left = min(c.get_upper_left_world()[0] for c in self.curves)
+        top = min(c.get_upper_left_world()[1] for c in self.curves)
+        right = max(c.get_lower_right_world()[0] for c in self.curves)
+        bottom = max(c.get_lower_righ_world()[1] for c in self.curves)
+        self.upper_left_world = np.array([left, top], dtype=globvar.POINT_NP_DTYPE)
+        self.lower_right_world = np.array([right, bottom], dtype=globvar.POINT_NP_DTYPE)
         return
 
     def get_str_worldspace_points(self):
@@ -160,7 +167,6 @@ class Contour(object):
         return globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD - len(self)
 
 
-
     # TODO
     def remove_curve(self, curve):
         return
@@ -208,8 +214,8 @@ class Contour(object):
             s.fill(custom_colors.RED)
             surface.blit(s, center - radius)
 
-            pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left(), radius)
-            pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right(), radius)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_world(), radius)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_world(), radius)
         return
 
     def draw_filled_polygon(self, surface, fill_color, width=1):

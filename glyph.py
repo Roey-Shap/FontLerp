@@ -4,6 +4,7 @@ import math
 import copy
 
 import global_variables as globvar
+import custom_math
 import custom_colors
 import contour
 import itertools
@@ -16,11 +17,8 @@ class Glyph(object):
 
         self.em_origin = globvar.empty_offset.copy()
 
-        self.origin_offset = globvar.empty_offset.copy()
-        self.scale = 1
-
-        self.upper_left = globvar.empty_offset.copy()
-        self.lower_right = globvar.empty_offset.copy()
+        self.upper_left_world = globvar.empty_offset.copy()
+        self.lower_right_world = globvar.empty_offset.copy()
         self.width = 0
         self.height = 0
 
@@ -71,7 +69,7 @@ class Glyph(object):
 
         return
 
-    def update_bounding_points(self):
+    def update_bounds(self):
         min_left = math.inf
         min_up = math.inf
         max_right = -math.inf
@@ -83,19 +81,34 @@ class Glyph(object):
             min_up = min(min_up, up_left[1])
             max_right = max(max_right, down_right[0])
             max_down = max(max_down, down_right[1])
-        self.upper_left = np.array([min_left, min_up], dtype=globvar.POINT_NP_DTYPE)
-        self.lower_right = np.array([max_right, max_down], dtype=globvar.POINT_NP_DTYPE)
+        self.upper_left_world = np.array([min_left, min_up], dtype=globvar.POINT_NP_DTYPE)
+        self.lower_right_world = np.array([max_right, max_down], dtype=globvar.POINT_NP_DTYPE)
         self.width = self.lower_right[0] - self.upper_left[0]
         self.height = self.lower_right[1] - self.upper_left[1]
         return
 
-    def get_bounding_box(self):
-        return pygame.Rect(0, 0, self.width, self.height)
+
+    def get_upper_left_world(self):
+        return self.upper_left_world
+
+    def get_lower_right_world(self):
+        return self.lower_right_world
+
+    def get_upper_left_camera(self):
+        return custom_math.world_to_cameraspace(self.upper_left_world)
+
+    def get_lower_right_camera(self):
+        return custom_math.world_to_cameraspace(self.lower_right_world)
+
+
+    def get_bounding_box_camera(self):
+        return pygame.Rect(self.get_upper_left_camera(),
+                           self.width * globvar.CAMERA_ZOOM, self.height * globvar.CAMERA_ZOOM)
 
     def draw(self, surface, radius, color_gradient=True, width=1):
         # define a surface on which the contours can draw their fills
-        bounding_box = self.get_bounding_box()
-        factor = 0.2
+        # bounding_box = self.get_bounding_box_camera()
+        # factor = 0.2
         # glyph_surface = pygame.Surface(globvar.SCREEN_DIMENSIONS*(1+factor))
         # glyph_surface = pygame.Surface((bounding_box.width * (1+factor), bounding_box.height * (1+factor)))
         # glyph_surface.fill(custom_colors.WHITE)
@@ -104,18 +117,11 @@ class Glyph(object):
         gray_value = 0.8 * 255
         fill_color = (gray_value, gray_value, gray_value)
         for contour in self.contours:
-            # TODO when refactoring to make the surface the size of the bounding box, either:
-            # 1) pass an offset all the way down , -self.upper_left (kinda ugly and unmaintainable?)
-            # 2) find a different way to make sure the curves draw onto this surface
             contour.draw_filled_polygon(surface, fill_color, width=width)
 
         # then let them draw their respective outlines
         for contour in self.contours:
             contour.draw(surface, radius, color_gradient, width=width)
-
-        # adj_corner = [self.upper_left[0] - (bounding_box.width * factor/2), self.upper_left[1] - (bounding_box.height * factor/2)]
-        # surface.blit(glyph_surface, adj_corner)
-        # surface.blit(surface, position)
         return
 
 def calc_contour_score_MSE(contour1, contour2):

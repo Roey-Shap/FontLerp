@@ -1,6 +1,7 @@
 import pygame
 import global_variables as globvar
 import custom_colors
+import custom_math
 import numpy as np
 
 class Cursor(object):
@@ -55,10 +56,10 @@ class Cursor(object):
     def step(self, point_radius):
         # Update zoom and panning
         y_scroll = globvar.mouse_scroll_directions[1]
-        if y_scroll:
+        if y_scroll != 0:
             prev_mouse_world_position = self.screen_to_world_space(self.mouse_pos)
             globvar.CAMERA_ZOOM *= 1 + (y_scroll * globvar.SCROLL_DELTA)
-            globvar.CAMERA_ZOOM = max(globvar.CAMERA_ZOOM, globvar.CAMERA_ZOOM_MIN)
+            globvar.CAMERA_ZOOM = custom_math.clamp(globvar.CAMERA_ZOOM, globvar.CAMERA_ZOOM_MIN, globvar.CAMERA_ZOOM_MAX)
             post_mouse_world_position = self.screen_to_world_space(self.mouse_pos)
 
             delta_mouse_pos = prev_mouse_world_position - post_mouse_world_position
