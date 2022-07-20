@@ -2,11 +2,12 @@ import numpy as np
 import pygame
 import custom_colors
 import global_variables as globvar
+import fonts
+import custom_math
 
-# An abstract representation of a Point to be manipulated by the mouse
-import global_variables
-
-
+"""
+An abstract representation of a Point to be manipulated by the mouse; coordinates are in WORLDSPACE ("true position")
+"""
 class Point(object):
     COLOR_IDLE = custom_colors.BLACK
     COLOR_HOVER = custom_colors.GRAY
@@ -30,21 +31,18 @@ class Point(object):
     def destroy(self):
         index = globvar.abstract_points.index(self)
         globvar.abstract_points.pop(index)
-
         return
 
-    def __len__(self):
-        return 2
-
     def check_mouse_hover(self, r, mouse_pos):
-        bounding_box = pygame.Rect(self.x - r, self.y - r, r * 2, r * 2)
+        self.changed_position_this_frame = False
+        self.prev_coords = self.np_coords()
+
+        bounding_box = custom_math.get_bounding_box_from_radius(self.x, self.y, r)
         self.hovered = bounding_box.collidepoint(mouse_pos)
         return self.hovered
 
     def handle_mouse_hover(self, mouse_pos, mouse_click_left, mouse_held):
-        changed_position_this_frame = False
         if self.held:
-            self.prev_coords = self.np_coords()
             self.update_coords(mouse_pos)
             globvar.selected_point = self
         self.clicked = self.hovered and mouse_click_left
@@ -52,6 +50,7 @@ class Point(object):
 
         if self.held:
             self.changed_position_this_frame = not np.all(np.isclose(self.prev_coords, self.np_coords()))
+
         return
 
     def deselect(self):
@@ -67,19 +66,17 @@ class Point(object):
         return np.array([self.x, self.y], dtype=globvar.POINT_NP_DTYPE)
 
 # Drawing Functions
-    def get_color(self):
-        # in decreasing priority; if you're held, you're also hovered, but should show held
-        if self.held or self.clicked:
-            return self.COLOR_CLICK
-        if self.hovered:
-            return self.COLOR_HOVER
-        return self.COLOR_IDLE
-
-    def draw(self, surface, radius, base_color=custom_colors.BLACK):
+    def draw(self, surface, radius, debug_info=False):
         if not self.is_endpoint:
             radius *= 0.75
         color = custom_colors.mix_color(self.base_color, self.get_color(), 0.5)
         pygame.draw.circle(surface, color, self.np_coords(), radius)
+
+        if debug_info:
+            text_rect = pygame.Rect(0, 0, 100, 100)
+            debug_text_surface = fonts.multiLineSurface("x: " + str(round(self.x)) + ", y: " + str(round(self.y)), fonts.FONT_DEBUG, text_rect,
+                                                        custom_colors.BLACK)
+            surface.blit(debug_text_surface, (self.np_coords()))
 
         if globvar.selected_point == self:
             debug_alpha = 0.45
@@ -87,4 +84,12 @@ class Point(object):
             s.set_alpha(np.floor(debug_alpha * 255))  # alpha level
             s.fill(custom_colors.LIME)
             surface.blit(s, (self.x - radius, self.y - radius))
+
+    def get_color(self):
+        # in decreasing priority; if you're held, you're also hovered, but should show held
+        if self.held or self.clicked:
+            return self.COLOR_CLICK
+        if self.hovered:
+            return self.COLOR_HOVER
+        return self.COLOR_IDLE
 

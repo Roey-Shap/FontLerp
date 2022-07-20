@@ -60,21 +60,14 @@ class Glyph(object):
             c.prune_curves()
         return
 
-    def set_offset(self, offset_x, offset_y):
-        self.origin_offset = np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE)
-        for contour in self.contours:
-            contour.set_offset(offset_x, offset_y)
-        return
 
-    def set_scale(self, scale):
-        self.scale = scale
+    def worldspace_offset_by(self, offset):
         for contour in self.contours:
-            contour.set_scale(self.scale)
-        return
+            contour.worldspace_offset_by(offset)
 
-    def em_scale(self, scale):
+    def worldspace_scale_by(self, scale):
         for contour in self.contours:
-            contour.em_scale(scale)
+            contour.worldspace_scale_by(scale)
 
         return
 
@@ -99,7 +92,7 @@ class Glyph(object):
     def get_bounding_box(self):
         return pygame.Rect(0, 0, self.width, self.height)
 
-    def draw(self, surface, radius, position, color_gradient=True, width=1):
+    def draw(self, surface, radius, color_gradient=True, width=1):
         # define a surface on which the contours can draw their fills
         bounding_box = self.get_bounding_box()
         factor = 0.2

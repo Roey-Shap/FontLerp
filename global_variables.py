@@ -2,6 +2,7 @@ import pygame
 import custom_colors
 import numpy as np
 import cursor
+import global_manager
 
 
 # Functions
@@ -19,6 +20,7 @@ FPS = 30
 
 CAMERA_ZOOM = 1
 CAMERA_OFFSET = empty_offset.copy()
+CAMERA_ZOOM_MIN = 0.0001
 
 GLYPH_UNIT_TO_WORLD_SPACE_RATIO = 4
 
@@ -47,7 +49,7 @@ curves = []
 contours = []
 glyphs = []
 
-bezier_accuracy = 15
+BEZIER_ACCURACY = 5
 t_values = None
 
 hovered_point = None

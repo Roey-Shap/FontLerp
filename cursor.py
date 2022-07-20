@@ -15,6 +15,7 @@ class Cursor(object):
         self.y_prev = 0
 
         self.panning = False
+        self.panned_this_frame = False
 
         self.x_select_start = 0
         self.y_select_start = 0
@@ -24,6 +25,7 @@ class Cursor(object):
         self.mouse_click = None
         self.mouse_held = False
         self.mouse_click_left = False
+
         return
 
     def update_mouse_variables(self):
@@ -40,6 +42,7 @@ class Cursor(object):
 
         # keep pressing and mode separate - might want to toggle mode later
         self.panning = globvar.KEY_SPACE_PRESSED
+        return
 
     def screen_to_world_space(self, screen_pos):
         screen_pos = np.array(screen_pos, dtype=globvar.POINT_NP_DTYPE)
@@ -54,19 +57,20 @@ class Cursor(object):
         y_scroll = globvar.mouse_scroll_directions[1]
         if y_scroll:
             prev_mouse_world_position = self.screen_to_world_space(self.mouse_pos)
-            globvar.CAMERA_ZOOM += y_scroll * globvar.SCROLL_DELTA
+            globvar.CAMERA_ZOOM *= 1 + (y_scroll * globvar.SCROLL_DELTA)
+            globvar.CAMERA_ZOOM = max(globvar.CAMERA_ZOOM, globvar.CAMERA_ZOOM_MIN)
             post_mouse_world_position = self.screen_to_world_space(self.mouse_pos)
 
             delta_mouse_pos = prev_mouse_world_position - post_mouse_world_position
             globvar.CAMERA_OFFSET += delta_mouse_pos
 
-        self.step_normal_mode(point_radius)
+        self.step_normal(point_radius)
 
         if self.panning:
-            self.step_pan_mode()
+            self.step_pan()
         return
 
-    def step_normal_mode(self, point_radius):
+    def step_normal(self, point_radius):
         if not self.mouse_held:
             self.multiselecting = False
 
@@ -103,6 +107,7 @@ class Cursor(object):
                     break
 
         if hovered_point is not None:
+            # hovered_point.check_mouse_hover(point_radius, self.mouse_pos)
             hovered_point.handle_mouse_hover(self.mouse_pos, self.mouse_click_left, self.mouse_held)
 
         not_hovering_above_point = hovered_point is None
@@ -115,17 +120,17 @@ class Cursor(object):
         globvar.hovered_point = hovered_point
         return
 
-    def step_pan_mode(self):
-        print("Panning!")
-
+    def step_pan(self):
         # find the difference in the mouse's position and the current to determine
         # how far in world space we've moved
 
         delta_x = self.x - self.x_prev
         delta_y = self.y - self.y_prev
 
-        globvar.CAMERA_OFFSET[0] -= delta_x / globvar.CAMERA_ZOOM
-        globvar.CAMERA_OFFSET[1] -= delta_y / globvar.CAMERA_ZOOM
+        if delta_x != 0 or delta_y != 0:
+            self.panned_this_frame = True
+            globvar.CAMERA_OFFSET[0] -= delta_x / globvar.CAMERA_ZOOM
+            globvar.CAMERA_OFFSET[1] -= delta_y / globvar.CAMERA_ZOOM
         return
 
     def draw(self, surface):

@@ -3,6 +3,7 @@
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
 import itertools
 import sys
 import time
@@ -12,9 +13,11 @@ import copy
 
 import global_variables as globvar
 import toolbar
-import custom_colors as colors
-import fonts
 import ttfConverter
+import fonts
+import custom_colors as colors
+import global_manager
+
 
 import pygame
 import curve
@@ -27,14 +30,13 @@ pygame.display.set_caption("Font Interpolater")
 clock = globvar.clock
 cursor = globvar.cursor
 
+manager = global_manager.GlobalManager()
 
 origin = globvar.origin
 curves = globvar.curves
 toolbar = toolbar.Toolbar()
 
-globvar.t_values = np.array([[(i/globvar.bezier_accuracy)**3,
-                              (i/globvar.bezier_accuracy)**2,
-                              (i/globvar.bezier_accuracy), 1] for i in range(globvar.bezier_accuracy+1)], dtype=globvar.POINT_NP_DTYPE)
+manager.calculate_t_array()
 
 line_width = 3
 base_scale = 1
@@ -48,53 +50,53 @@ glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DE
 
 
 
-extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
-extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
+# extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
+# extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
+#
+#
+# test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
+# test_glyphs = []
+#
+# for i, font in enumerate(test_fonts):
+#     g = glyph.Glyph()
+#     test_glyphs.append(g)
+#     contours = ttfConverter.test_font_load("A", font)
+#     num_curves = 0
+#     for c in contours:
+#         contour_object = ttfConverter.convert_quadratic_flagged_points_to_contour(c)
+#         g.append_contour(contour_object)
+#         num_curves += len(contour_object)
+#         print(c)
+#     g.set_offset(w * ((i+1)/5), h/2)
+#     g.update_bounding_points()
+#
+#     print("Made glyph with upper left:", g.upper_left, "and lower right", g.lower_right)
+#     r = g.lower_right - g.upper_left
+#     print("... and thus width:", r[0], "and height:", r[1])
+#     print("Glyph has", num_curves, "curves")
+#     print("")
 
 
-test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
-test_glyphs = []
-
-for i, font in enumerate(test_fonts):
-    g = glyph.Glyph()
-    test_glyphs.append(g)
-    contours = ttfConverter.test_font_load("A", font)
-    num_curves = 0
-    for c in contours:
-        contour_object = ttfConverter.convert_quadratic_flagged_points_to_contour(c)
-        g.append_contour(contour_object)
-        num_curves += len(contour_object)
-        print(c)
-    g.set_offset(w * ((i+1)/5), h/2)
-    g.update_bounding_points()
-
-    print("Made glyph with upper left:", g.upper_left, "and lower right", g.lower_right)
-    r = g.lower_right - g.upper_left
-    print("... and thus width:", r[0], "and height:", r[1])
-    print("Glyph has", num_curves, "curves")
-    print("")
+#
+# test_h = glyph.Glyph()
+# test_i = glyph.Glyph()
+# for cnt in extracted_h1_data:
+#     test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+# # test_h.prune_curves()
+# test_h.true_scale_by(0.07)
+# test_h.set_offset(0, h/2)
+#
+# # test_i = test_h.copy()
+# # test_i.em_scale(0.8)
+#
+# for cnt in extracted_h2_data:
+#     test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+# test_i.true_scale_by(0.1)
+# test_i.set_offset(0, h/2)
 
 
-
-test_h = glyph.Glyph()
-test_i = glyph.Glyph()
-for cnt in extracted_h1_data:
-    test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
-# test_h.prune_curves()
-test_h.em_scale(0.07)
-test_h.set_offset(0, h/2)
-
-# test_i = test_h.copy()
-# test_i.em_scale(0.8)
-
-for cnt in extracted_h2_data:
-    test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
-test_i.em_scale(0.1)
-test_i.set_offset(0, h/2)
-
-
-if len(test_h) == 2:
-    test_h.contours[-1].fill=contour.FILL.SUBTRACT
+# if len(test_h) == 2:
+#     test_h.contours[-1].fill=contour.FILL.SUBTRACT
 
 
 circle_const = globvar.CIRCLE_CONST
@@ -139,38 +141,44 @@ circle_a4 = np.array([[-1, 1],
                       [-1, 1-circle_const],
                       [-circle_const, 0],
                       [0, 0]])
-
-
-cont = contour.Contour()
-cont.append_curves_from_np([c1, c2, c3, c4, c5, c6])
-cont.set_offset(4, 1.5)
-cont.set_scale(base_scale)
+#
+# cont = contour.Contour()
+# cont.append_curves_from_np([c1, c2, c3, c4, c5, c6])
+# cont.set_offset(4, 1.5)
+# cont.set_scale(base_scale)
 
 circle = contour.Contour()
 circle.append_curves_from_np([circle_a1, circle_a2, circle_a3, circle_a4])
-circle.set_offset(4, 3.5)
-circle.set_scale(base_scale)
+# circle.set_offset(4, 3.5)
 
-circle_mini = circle.copy()
-circle_mini.fill=contour.FILL.SUBTRACT
-circle_mini.em_scale(0.7)
-circle_mini.em_offset(0.05, 0.25)
+circle_size = 100
+circle_g = glyph.Glyph()
+circle_g.append_contour(circle)
+circle_g.worldspace_scale_by(circle_size)
+circle_g.worldspace_offset(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
+circle_g.worldspace_offset(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
 
-circle_mini2 = circle_mini.copy()
-circle_mini2.fill = contour.FILL.ADD
-circle_mini2.em_scale(0.3)
-circle_mini2.em_offset(0, -1)
-circle_mini2.set_offset(4, 1.6)
+# circle_mini = circle.copy()
+# circle_mini.fill=contour.FILL.SUBTRACT
+# circle_mini.em_scale(0.7)
+# circle_mini.em_offset(0.05, 0.25)
+#
+#
+# circle_mini2 = circle_mini.copy()
+# circle_mini2.fill = contour.FILL.ADD
+# circle_mini2.em_scale(0.3)
+# circle_mini2.em_offset(0, -1)
+# circle_mini2.set_offset(4, 1.6)
 
-
-glyph_O = glyph.Glyph()
-glyph_O.append_contours_multi([circle, circle_mini])
-glyph_O.update_bounding_points()
-
-
-glyph_test = glyph.Glyph()
-glyph_test.append_contours_multi([circle_mini2, cont])
-glyph_test.update_bounding_points()
+#
+# glyph_O = glyph.Glyph()
+# glyph_O.append_contours_multi([circle, circle_mini])
+# glyph_O.update_bounding_points()
+#
+#
+# glyph_test = glyph.Glyph()
+# glyph_test.append_contours_multi([circle_mini2, cont])
+# glyph_test.update_bounding_points()
 
 
 mixed_glyph = None
@@ -186,14 +194,14 @@ not_scrolling = True
 running = True
 while running:
 
-    point_radius = 3
+    point_radius = 5
 
 # Clock Updates
     clock.tick(globvar.FPS)
-
     globvar.mouse_scroll_directions = globvar.empty_offset
-    prev_scale = globvar.CAMERA_ZOOM
+    prev_accuracy = globvar.BEZIER_ACCURACY
     last_not_scrolling = not_scrolling
+
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -231,7 +239,34 @@ while running:
     # synchronize Cursor object with inputs
     cursor.update_mouse_variables()
     cursor.step(point_radius)
+    panned_camera = cursor.panned_this_frame
 
+
+    # if there were zoom updates, get update the bezier accuracy and get new t values
+    if just_stopped_scrolling:
+        manager.update_bezier_accuracy()
+        if globvar.BEZIER_ACCURACY != prev_accuracy:
+            manager.calculate_t_array()
+
+    # update Bezier curves in response to any points which changed
+    for curve in globvar.curves:
+        # check for updates in abstract points (whose positions are in WORLDSPACE)
+        curve.check_abstract_points()
+
+        # update the curves based on the cursor's panning and offsetting
+        if just_stopped_scrolling or panned_camera:
+            curve.update_points()
+
+
+    # Update zoom scale
+    # for g in globvar.glyphs:
+    #     g.em_scale(globvar.GLOBAL_SCALE * base_scale)
+
+        # test_glyphs[0].set_scale(globvar.CAMERA_ZOOM * base_scale)
+
+    glyph_box_offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
+    glyph_box = pygame.Rect(glyph_box_offset_corner * globvar.CAMERA_ZOOM,
+                            globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS * globvar.CAMERA_ZOOM)
 
 
     # Reset the mixed contour on display
@@ -251,23 +286,7 @@ while running:
 
 
 
-    # update Bezier curves in response to any points which changed
-    for curve in globvar.curves:
-        # check for updates in abstract points
-        curve.check_abstract_points(point_radius)
-        curve.step()
-
-    # Update zoom scale
-    # for g in globvar.glyphs:
-    #     g.em_scale(globvar.GLOBAL_SCALE * base_scale)
-    if just_stopped_scrolling:
-        test_glyphs[0].set_scale(globvar.CAMERA_ZOOM * base_scale)
-
-    offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
-    glyph_box = pygame.Rect(offset_corner * globvar.CAMERA_ZOOM,
-                            globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS * globvar.CAMERA_ZOOM)
-
-    # Rendering
+    # Rendering ===============================================================================================
     screen.fill(colors.WHITE)
 
     # Left glyph unit boundaries
@@ -275,7 +294,8 @@ while running:
     corner_rad = 3
     pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
-    test_glyphs[0].draw(screen, point_radius, [0, 0])
+    circle_g.draw(screen, point_radius)
+    # test_glyphs[0].draw(screen, point_radius, [0, 0])
     # for g in test_glyphs:
     #     g.draw(screen, point_radius, [0, 0])
 
@@ -308,6 +328,7 @@ while running:
 
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
+                          "Bezier Accuracy " + str(globvar.BEZIER_ACCURACY),
                           "Framerate: " + str(round(clock.get_fps(), 4)),
                           "Mouse position: " + str(mouse_pos),
                           "Mouse position in world: " + str(cursor.screen_to_world_space(mouse_pos)),

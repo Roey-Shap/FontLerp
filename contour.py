@@ -21,7 +21,7 @@ def ncr(n, r):
     r = min(r, n-r)
     numer = reduce(op.mul, range(n, n-r, -1), 1)
     denom = reduce(op.mul, range(1, r+1), 1)
-    return numer // denom  # or / in Python 2
+    return numer // denom
 
 
 class FILL(int):
@@ -34,11 +34,10 @@ class Contour(object):
     def __init__(self):
         self.curves = []
         self.num_points = 0
+        self.upper_left_world = globvar.empty_offset.copy()
+        self.lower_right_world = globvar.empty_offset.copy()
 
         self.em_origin = globvar.empty_offset.copy()
-
-        self.origin_offset = globvar.empty_offset.copy()
-        self.scale = 1
 
         self.fill = FILL.ADD
 
@@ -57,42 +56,22 @@ class Contour(object):
         globvar.contours.append(clone)
         return clone
 
-    """
-    Move the Contour by some offset
-    """
-    def set_offset(self, offset_x, offset_y):
-        self.origin_offset = np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE)
+    def worldspace_offset(self, offset):
         for curve in self.curves:
-            curve.set_offset(self.origin_offset)
+            curve.worldspace_offset_by(offset)
         return
 
-    # def set_global_offset(self, offset_x, offset_y):
-    #     for curve in self.curves:
-    #         curve.set_offset(self.origin_offset + np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE))
-
-    def set_scale(self, scale):
-        self.scale = scale
-        for curve in self.curves:
-            curve.set_scale(self.scale)
-        return
-
-    def em_offset(self, offset_x, offset_y):
-        offset = np.array([offset_x, offset_y], dtype=globvar.POINT_NP_DTYPE)
-        for curve in self.curves:
-            curve.em_offset(offset)
-        return
-
-    def em_scale(self, scale):
-        for i, curve in enumerate(self.curves):
-            print("Updating", i)
-            curve.em_scale(scale)
+    def worldspace_scale_by(self, scale):
+        for curve in enumerate(self.curves):
+            curve.worldspace_scale_by(scale)
 
         return
 
     def append_curve(self, curve):
-        # print("appended curve for contour", self, "which before t?he add had", len(self), "curves")
         self.curves.append(curve)
-        self.num_points += curve.tween_points.shape[0]
+        self.num_points += curve.tween_points.shape[0]          # for finding the average later
+        self.upper_left_world = np.min(self.upper_left_world, curve.get_upper_left_world())
+        self.lower_right_world = np.min(self.lower_right_world, curve.get_lower_right_world())
         return
 
     def append_curve_multi(self, curves):
@@ -105,29 +84,24 @@ class Contour(object):
             self.append_curve(curve.Bezier(curve_data))
         return
 
-    def get_true_points(self):
+    def get_str_worldspace_points(self):
         string = ""
         for curve in self.curves:
-            string += str(np.round(curve.true_points, 3)) + "\n"
+            string += str(np.round(curve.worldspace_points, 3)) + "\n"
         return string
 
-    def get_upper_left(self):
-        min_left = math.inf
-        min_up = math.inf
-        for curve in self.curves:
-            up_left = curve.get_upper_left()
-            min_left = min(min_left, up_left[0])
-            min_up = min(min_up, up_left[1])
-        return np.array([min_left, min_up], dtype=globvar.POINT_NP_DTYPE)
+    def get_upper_left_world(self):
+        return self.upper_left_world
 
-    def get_lower_right(self):
-        max_right = -math.inf
-        max_down = -math.inf
-        for curve in self.curves:
-            down_right = curve.get_lower_right()
-            max_right = max(max_right, down_right[0])
-            max_down = max(max_down, down_right[1])
-        return np.array([max_right, max_down], dtype=globvar.POINT_NP_DTYPE)
+    def get_lower_right_world(self):
+        return self.lower_right_world
+
+    def get_upper_left_camera(self):
+        return custom_math.world_to_cameraspace(self.upper_left_world)
+
+    def get_lower_right_camera(self):
+        return custom_math.world_to_cameraspace(self.lower_right_world)
+
 
     """
     Check that each curve is connected to the following
