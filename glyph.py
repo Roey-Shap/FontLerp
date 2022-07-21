@@ -75,18 +75,18 @@ class Glyph(object):
         max_right = -math.inf
         max_down = -math.inf
         for contour in self.contours:
-            up_left = contour.get_upper_left()
-            down_right = contour.get_lower_right()
+            contour.update_bounds()
+            up_left = contour.get_upper_left_world()
+            down_right = contour.get_lower_right_world()
             min_left = min(min_left, up_left[0])
             min_up = min(min_up, up_left[1])
             max_right = max(max_right, down_right[0])
             max_down = max(max_down, down_right[1])
         self.upper_left_world = np.array([min_left, min_up], dtype=globvar.POINT_NP_DTYPE)
         self.lower_right_world = np.array([max_right, max_down], dtype=globvar.POINT_NP_DTYPE)
-        self.width = self.lower_right[0] - self.upper_left[0]
-        self.height = self.lower_right[1] - self.upper_left[1]
+        self.width = self.lower_right_world[0] - self.upper_left_world[0]
+        self.height = self.lower_right_world[1] - self.upper_left_world[1]
         return
-
 
     def get_upper_left_world(self):
         return self.upper_left_world
@@ -100,10 +100,25 @@ class Glyph(object):
     def get_lower_right_camera(self):
         return custom_math.world_to_cameraspace(self.lower_right_world)
 
+    def get_bounding_box_world(self):
+        return pygame.Rect(self.get_upper_left_world(), self.width, self.height)
 
     def get_bounding_box_camera(self):
         return pygame.Rect(self.get_upper_left_camera(),
                            self.width * globvar.CAMERA_ZOOM, self.height * globvar.CAMERA_ZOOM)
+
+    def get_center_world(self):
+        upper_left = self.get_upper_left_world()
+        world_dimensions = np.array([self.width, self.height])
+        return upper_left + (world_dimensions/2)
+
+    """
+    The center is defined to be the center of the bounding box of the glyph
+    """
+    def get_center_camera(self):
+        upper_left = self.get_upper_left_camera()
+        camera_dimensions = np.array([self.width, self.height]) * globvar.CAMERA_ZOOM
+        return upper_left + (camera_dimensions/2)
 
     def draw(self, surface, radius, color_gradient=True, width=1):
         # define a surface on which the contours can draw their fills
@@ -122,6 +137,11 @@ class Glyph(object):
         # then let them draw their respective outlines
         for contour in self.contours:
             contour.draw(surface, radius, color_gradient, width=width)
+
+        if globvar.DEBUG:
+            # pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius)
+            # pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_center_camera(), radius)
         return
 
 def calc_contour_score_MSE(contour1, contour2):
@@ -160,7 +180,14 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
 
     if debug_info:
         print("Finding mapping for G1 with", n1, "contours and", str(sum(len(c) for c in glyph1.contours)), "curves")
-        print("            ... and G2 with", n1, "contours and", str(sum(len(c) for c in glyph2    .contours)), "curves")
+        print("            ... and G2 with", n1, "contours and", str(sum(len(c) for c in glyph2.contours)), "curves")
+
+    g1_center = glyph1.get_center_world()
+    g2_center = glyph2.get_center_world()
+
+    glyph1.worldspace_offset_by(-g1_center)
+    glyph2.worldspace_offset_by(-g2_center)
+
 
     # TODO implement clockwise/CCW preference in contour mapping
     # pick a mapping of glyph2's contours to glyph1's (any to any)
@@ -216,6 +243,9 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
         best_mapping.append([c2_index, current_best_mapping])
         total_score += current_best_score
 
+    glyph1.worldspace_offset_by(g1_center)
+    glyph2.worldspace_offset_by(g2_center)
+
     return best_mapping, total_score
 
 
@@ -224,7 +254,13 @@ def lerp_glyphs(glyph1, glyph2, mappings, t, debug_info=False):
     n1 = len(glyph1)
     n2 = len(glyph2)
 
-    # then the rest of glyph1's contours can pick as they please
+    g1_center = glyph1.get_center_world()
+    g2_center = glyph2.get_center_world()
+
+    glyph1.worldspace_offset_by(-g1_center)
+    glyph2.worldspace_offset_by(-g2_center)
+
+
     for g1_contour_index, g1_mapping_details in enumerate(mappings):
         g2_contour_index, g2_contour_mapping = g1_mapping_details
         # print("current details:", g1_mapping_details)
@@ -237,6 +273,10 @@ def lerp_glyphs(glyph1, glyph2, mappings, t, debug_info=False):
         lerped_contour.fill = g1_contour.fill
 
         lerped_glpyh.append_contour(lerped_contour)
+
+    glyph1.worldspace_offset_by(g1_center)
+    glyph2.worldspace_offset_by(g2_center)
+
 
     return lerped_glpyh
 

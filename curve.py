@@ -28,10 +28,12 @@ class Curve(object):
         if not isinstance(worldspace_points, np.ndarray):
             raise ValueError("tried inputting: \'", worldspace_points, "\' as an ndarray when it wasn't one")
 
+        worldspace_points = worldspace_points.astype(globvar.POINT_NP_DTYPE)
+
         self.num_points = worldspace_points.shape[0]
 
         self.worldspace_points = worldspace_points.copy()
-        self.cameraspace_points = worldspace_points.astype(globvar.POINT_NP_DTYPE)
+        self.cameraspace_points = worldspace_points.copy()
 
         self.abstract_points = []
         self.average_point = None
@@ -95,6 +97,8 @@ class Curve(object):
     def get_lower_right_camera(self):
         return np.max(self.cameraspace_points, axis=0)
 
+    def get_center_camera(self):
+        return np.average(self.cameraspace_points, axis=0)
 
     """
     Return the angle of line formed by the endpoints in degrees
@@ -227,14 +231,7 @@ class Bezier(Curve):
     Draws the lines connected the precomputed "render points
     """
     def draw_tween_lines(self, surface, color, width=1):
-        num_render_points = len(self.tween_points)
-        p1 = self.tween_points[0]
-        p2 = p1
-        for i in range(num_render_points-1):
-            p1 = p2
-            p2 = self.tween_points[i+1]
-            pygame.draw.aaline(surface, color, p1, p2)
-
+        pygame.draw.aalines(surface, color, closed=False, points=self.tween_points)
         return
 
     """

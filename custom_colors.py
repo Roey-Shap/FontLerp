@@ -21,6 +21,8 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 LIME = pygame.Color("#55FF00")
 MUTED_BLUE = pygame.Color("#3B719F")
+NEON_BLUE = pygame.Color("#04d9ff")
+NEON_RED = pygame.Color("#ff1818")
 
 GRAY = mix_color(BLACK, WHITE, 0.45)
 LT_GRAY = mix_color(BLACK, WHITE, 0.75)

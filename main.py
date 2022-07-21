@@ -53,9 +53,9 @@ glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DE
 # extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
 # extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
 #
-#
-# test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
-# test_glyphs = []
+
+test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
+test_glyphs = []
 #
 # for i, font in enumerate(test_fonts):
 #     g = glyph.Glyph()
@@ -77,26 +77,29 @@ glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DE
 #     print("")
 
 
-#
-# test_h = glyph.Glyph()
-# test_i = glyph.Glyph()
-# for cnt in extracted_h1_data:
-#     test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
-# # test_h.prune_curves()
-# test_h.true_scale_by(0.07)
-# test_h.set_offset(0, h/2)
-#
-# # test_i = test_h.copy()
-# # test_i.em_scale(0.8)
-#
-# for cnt in extracted_h2_data:
-#     test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
-# test_i.true_scale_by(0.1)
-# test_i.set_offset(0, h/2)
 
+extracted_h1_data = ttfConverter.test_font_load("o", test_fonts[0])
+extracted_h2_data = ttfConverter.test_font_load("o", test_fonts[1])
+test_h = glyph.Glyph()
+test_i = glyph.Glyph()
+for cnt in extracted_h1_data:
+    test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+# test_h.prune_curves()
+test_h.worldspace_scale_by(0.1)
+test_h.worldspace_offset_by(np.array([w/4, h/2]))
+test_h.update_bounds()
+# test_h.worldspace_offset_by(-test_h.get_center_world())
 
-# if len(test_h) == 2:
-#     test_h.contours[-1].fill=contour.FILL.SUBTRACT
+# test_i = test_h.copy()
+# test_i.em_scale(0.8)
+
+for cnt in extracted_h2_data:
+    test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+test_i.worldspace_scale_by(0.12)
+test_i.worldspace_offset_by(np.array([w*3/4, h/2]))
+test_i.update_bounds()
+# test_i.worldspace_offset_by(-test_i.get_center_world())
+
 
 
 circle_const = globvar.CIRCLE_CONST
@@ -183,10 +186,10 @@ circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_
 
 mixed_glyph = None
 mappings = None
-# mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
+mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
 
 
-# mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
+mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
 
 not_scrolling = True
 
@@ -256,13 +259,6 @@ while running:
         if just_stopped_scrolling or panned_camera:
             curve.update_points()
 
-
-    # Update zoom scale
-    # for g in globvar.glyphs:
-    #     g.em_scale(globvar.GLOBAL_SCALE * base_scale)
-
-        # test_glyphs[0].set_scale(globvar.CAMERA_ZOOM * base_scale)
-
     glyph_box_offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
     glyph_box = pygame.Rect(glyph_box_offset_corner * globvar.CAMERA_ZOOM,
                             globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS * globvar.CAMERA_ZOOM)
@@ -273,15 +269,17 @@ while running:
         mixed_glyph.destroy()
         mixed_glyph = None
 
-        # mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
-
-
+    for g in globvar.glyphs:
+        g.update_bounds()
 
 
     # Remix the glyph
-    # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-    # mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, mix_t)
-    # mixed_glyph.set_offset(0, h/2)
+    if mappings is not None:
+        mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
+        mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, mix_t)
+        mixed_glyph.worldspace_offset_by(np.array([w/2, h/2]))
+
+
 
 
 
@@ -293,27 +291,16 @@ while running:
     corner_rad = 3
     pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
-    circle_g.draw(screen, point_radius)
-    # test_glyphs[0].draw(screen, point_radius, [0, 0])
+    mixed_glyph.draw(screen, point_radius)
     # for g in test_glyphs:
     #     g.draw(screen, point_radius, [0, 0])
 
-    # mixed_glyph.draw(screen, point_radius, [0, 0])
-    # cont.draw_filled_polygon(screen, colors.RED)
-    # cont.draw(screen, point_radius, color_gradient=True, width=line_width)
-    # circle_mini2.draw_filled_polygon(screen, colors.BLUE)
-    # circle_mini2.draw(screen, point_radius, color_gradient=True, width=line_width)
 
-    # test_h.draw(screen, point_radius, [w/4, h/4])
-    # test_i.draw(screen, point_radius, [w / 2, h / 4])
-    # mixed_glyph.draw(screen, point_radius, [w/4, h/4])
+    test_h.draw(screen, point_radius)
+    test_i.draw(screen, point_radius)
 
-
-    # test_contour.draw(screen, point_radius, color_gradient=True, width=line_width)
-
-    # for c in globvar.contours:
-    #     c.draw(screen, point_radius)
-
+    if mappings is not None:
+        manager.draw_mapping_reduction(screen, test_h, test_i, mappings)
 
     # GUI drawing
     cursor.draw(screen)
@@ -322,15 +309,15 @@ while running:
 
     # Debug drawing
     if globvar.DEBUG:
-        pygame.draw.circle(screen, colors.RED, globvar.SCREEN_DIMENSIONS, 5)
-        pygame.draw.circle(screen, colors.RED, origin, 5)
+        pygame.draw.circle(screen, colors.RED, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
+        pygame.draw.circle(screen, colors.RED, custom_math.world_to_cameraspace(origin), 5)
 
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
                           "Bezier Accuracy " + str(globvar.BEZIER_ACCURACY),
                           "Framerate: " + str(round(clock.get_fps(), 4)),
-                          "Mouse position: " + str(mouse_pos),
-                          "Mouse position in world: " + str(cursor.screen_to_world_space(mouse_pos)),
+                          "Mouse position: " + str(np.round(mouse_pos, 3)),
+                          "Mouse position in world: " + str(np.round(cursor.screen_to_world_space(mouse_pos), 3)),
                           "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
                           "Mapping: " + str(mappings)]
         for i, message in enumerate(debug_messages):

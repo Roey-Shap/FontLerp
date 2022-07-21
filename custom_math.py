@@ -1,3 +1,4 @@
+import numpy as np
 import pygame
 import global_variables as globvar
 
@@ -28,5 +29,45 @@ def camera_to_worldspace(np_array):
 def world_to_cameraspace(np_array):
     return (np_array - globvar.CAMERA_OFFSET) * globvar.CAMERA_ZOOM
 
+
 def clamp(value, min_val, max_val):
     return max(min_val, min(max_val, value))
+
+
+def weighted(nb):
+    if nb is None:
+        return float('inf')
+    else:
+        return nb
+
+
+def sort_dictionary(dictionary, by_key_or_value=0):
+    return {k: v for k, v in sorted(dictionary.items(), key=lambda item: weighted(item[by_key_or_value]))}
+
+def get_keys_from_value(d, val):
+    return [k for k, v in d.items() if v == val]
+
+
+"""
+Returns +1 if the points move in clockwise fashion and -1 if they move in counter-clockwise fashion
+"""
+def points_clock_direction(points):
+    num_points = len(points)
+    signed_area = 0
+    x1, y1 = points[0]
+    x2 = x1
+    y2 = y1
+    for i in range(num_points):
+        x1 = x2
+        y1 = y2
+        x2, y2 = points[i]
+
+        signed_area += (x1 * y2) - (x2 * y1)
+
+    # don't forget about the cyclic last point!
+    x1 = x2
+    y1 = y2
+    x2, y2 = points[0]
+    signed_area += (x1 * y2) - (x2 * y1)
+
+    return np.sign(signed_area)

@@ -50,7 +50,7 @@ curves = []
 contours = []
 glyphs = []
 
-BEZIER_ACCURACY = 5
+BEZIER_ACCURACY = 15
 t_values = None
 
 hovered_point = None
