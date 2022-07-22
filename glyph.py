@@ -69,6 +69,12 @@ class Glyph(object):
 
         return
 
+    def sort_contours_by_fill(self):
+        direction_dictionary = {contour: contour.fill for contour in self.contours}
+        direction_dictionary = custom_math.sort_dictionary(direction_dictionary, 1, reverse=True)
+        self.contours = [contour for contour in direction_dictionary.keys()]
+        return
+
     def update_bounds(self):
         min_left = math.inf
         min_up = math.inf
@@ -113,14 +119,80 @@ class Glyph(object):
         return upper_left + (world_dimensions/2)
 
     """
-    The center is defined to be the center of the bounding box of the glyph
+    The center is defined to be the average of the predetermined number of points which are plotted along the curves
     """
     def get_center_camera(self):
-        upper_left = self.get_upper_left_camera()
-        camera_dimensions = np.array([self.width, self.height]) * globvar.CAMERA_ZOOM
-        return upper_left + (camera_dimensions/2)
 
-    def draw(self, surface, radius, color_gradient=True, width=1):
+        average_point = np.array([0, 0], dtype=globvar.POINT_NP_DTYPE)
+
+        # determine how many points each contour gets by their length
+        contour_lengths = {contour_index: self.contours[contour_index].get_length_worldspace()
+                           for contour_index in range(len(self))}
+        total_length = sum(length for length in contour_lengths.values())
+        percentages_of_total_length = {contour_index: contour_lengths[contour_index]/total_length for contour_index in contour_lengths}
+
+        # now we need to know what overall t values and for what curves we need to get each point to be
+        # the same length along the contour
+        for contour_index, percentage in percentages_of_total_length.items():
+            points_allotted = round(globvar.POINTS_TO_CHECK_AVERAGE_WITH * percentage)
+            c = self.contours[contour_index]
+            # we know how much distance should be between each point; use that
+            dis_between_points = contour_lengths[contour_index] / points_allotted
+
+            num_curves = len(c)
+
+            # now find these points by walking along the contour and add their values to the average
+            curve_index = 0
+            curve_obj = c.curves[curve_index]
+            point_index = 0
+            point = curve_obj.worldspace_tween_points[point_index]
+
+            prev_point = point
+
+            point_index += 1
+
+            for p in range(points_allotted):
+                distance_remaining = dis_between_points
+                # continue until you have no distance left or no curves left in the contour
+                while distance_remaining > 0 and curve_index < num_curves:
+                    # walk along the next piece of the curve
+                    # if you've reached the end of this curve, move to next curve
+                    if point_index == curve_obj.num_points:
+                        point_index = 0
+                        curve_index += 1
+                        if curve_index == num_curves:
+                            break
+                        curve_obj = c.curves[curve_index]
+
+                    point = curve_obj.worldspace_tween_points[point_index]
+                    distance_travelled = np.linalg.norm(point - prev_point)
+
+                    # TODO make it so that we're even more specific and take pieces of distance travelled?
+                    #  it's a straight line, so we could calculate what percentage of it we need to traverse...
+                    #  and that would make it more accurate...
+
+                    distance_remaining -= distance_travelled
+
+                    point_index += 1
+
+                # if you ran out of curves in the contour and have distance left,
+                # the point naturally gets placed at the end, which is a good solution to that edge-case
+                target_point = point
+                # pygame.draw.circle(globvar.screen, (0, 255, 0), custom_math.world_to_cameraspace(target_point), 6)
+                average_point += custom_math.world_to_cameraspace(target_point)
+
+
+        # we now have the sum of all of the surrounding points; convert to average
+        average_point /= globvar.POINTS_TO_CHECK_AVERAGE_WITH
+
+        print("average in worldspace is:", average_point)
+        return average_point
+
+        # upper_left = self.get_upper_left_camera()
+        # camera_dimensions = np.array([self.width, self.height]) * globvar.CAMERA_ZOOM
+        # return upper_left + (camera_dimensions/2)
+
+    def draw(self, surface, radius, width=1):
         # define a surface on which the contours can draw their fills
         # bounding_box = self.get_bounding_box_camera()
         # factor = 0.2
@@ -136,7 +208,7 @@ class Glyph(object):
 
         # then let them draw their respective outlines
         for contour in self.contours:
-            contour.draw(surface, radius, color_gradient, width=width)
+            contour.draw(surface, radius, color=None, width=width)
 
         if globvar.DEBUG:
             # pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius)
@@ -204,7 +276,7 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
             # with g1_subset and g2_perm we've decided on a potential first part of a glyph mapping
             # find the potential mapping's score by adding all of the contour mapping scores for each pair of contours
             current_mapping_set_score = 0
-            current_mapping = []
+            current_mapping = {c1: None for c1 in range(n1)}
             for g1_c, g2_c in zip(g1_subset, g2_perm):
                 g1_contour = glyph1.contours[g1_c]
                 g2_contour = glyph2.contours[g2_c]
@@ -213,7 +285,7 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
                 current_mapping_set_score += score
                 # recall that we give this from g1's perspective, so a mapping pair for this 'c1' is
                 # a corresponding g2 contour 'c2' and the mapping between them
-                current_mapping.append([g2_c, mapping])
+                current_mapping[g1_c] = (g2_c, mapping)
             if current_mapping_set_score > best_score:
                 best_mapping = current_mapping
                 best_score = current_mapping_set_score
@@ -231,6 +303,7 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
         contour1 = glyph1.contours[g1_index]
         # find this contour's best match in glyph2
         current_best_mapping = None
+        current_c2_index = -1
         current_best_score = -math.inf
         for c2_index, contour2 in enumerate(glyph2.contours):
             # reminder: returns the best mapping of curves and score of that mapping
@@ -238,9 +311,10 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
             if mapping_score > current_best_score:
                 current_best_mapping = mapping
                 current_best_score = mapping_score
+                current_c2_index = c2_index
         # we've now decided which of G2's contours is best
         # append contour1's mapping with it and add the mapping's score
-        best_mapping.append([c2_index, current_best_mapping])
+        best_mapping[g1_index] = (current_c2_index, current_best_mapping)
         total_score += current_best_score
 
     glyph1.worldspace_offset_by(g1_center)
@@ -260,16 +334,17 @@ def lerp_glyphs(glyph1, glyph2, mappings, t, debug_info=False):
     glyph1.worldspace_offset_by(-g1_center)
     glyph2.worldspace_offset_by(-g2_center)
 
-
-    for g1_contour_index, g1_mapping_details in enumerate(mappings):
-        g2_contour_index, g2_contour_mapping = g1_mapping_details
+    # mappings is a dictionary of form (contour in g1, (contour in g2, mapping from c1 -> c2))
+    for g1_contour_index in mappings:
+        g2_contour_index, g2_contour_mapping = mappings[g1_contour_index]
         # print("current details:", g1_mapping_details)
         g1_contour = glyph1.contours[g1_contour_index]
         g2_contour = glyph2.contours[g2_contour_index]
         lerped_contour = contour.lerp_contours_OMin(g1_contour, g2_contour, g2_contour_mapping, t)
 
         # TODO set contour fill type correctly
-        # TODO for now, it'll just be its original type (should still be that way later...? I think?)
+        #  for now, it'll just be its original type (should still be that way later...? I think? Since
+        #  we can choose the correct one in the mapping to begin with?)
         lerped_contour.fill = g1_contour.fill
 
         lerped_glpyh.append_contour(lerped_contour)

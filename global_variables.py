@@ -4,7 +4,6 @@ import numpy as np
 import cursor
 import global_manager
 
-
 # Functions
 def em_to_worldspace(np_array):
     return np_array / (GLYPH_UNIT_TO_WORLD_SPACE_RATIO*CAMERA_ZOOM)
@@ -29,29 +28,19 @@ CONTOUR_CURVE_AMOUNT_THRESHOLD = 30
 DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS = em_to_worldspace(np.array([1200, 1300], dtype=POINT_NP_DTYPE))
 DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT = SCREEN_DIMENSIONS * np.array([1/5, 1/3])
 
+# Meta constants
+DEBUG_MESSAGE_POSITION = SCREEN_DIMENSIONS * np.array([0.5, 0.2])
+SCROLL_DELTA = 0.025
+POINT_DRAW_RADIUS = 3
+POINTS_TO_CHECK_AVERAGE_WITH = 50
 
+# Shape constants
 CIRCLE_CONST = 0.552284749831
 
 
 
 # Meta control variables
 DEBUG = True
-
-# Runtime control variables
-pygame.init()
-screen = pygame.display.set_mode(SCREEN_DIMENSIONS)
-clock = pygame.time.Clock()
-cursor = cursor.Cursor()
-
-origin = pygame.math.Vector2(0, 0)
-selected_objects = []
-abstract_points = []
-curves = []
-contours = []
-glyphs = []
-
-BEZIER_ACCURACY = 15
-t_values = None
 
 hovered_point = None
 selected_point = None
@@ -65,5 +54,32 @@ mouse_scroll_directions = empty_offset
 KEY_SPACE_HELD = False
 KEY_SPACE_PRESSED = False
 
-SCROLL_DELTA = 0.025
+show_current_glyph_mapping = False
+show_extra_curve_information = True
+
+BEZIER_ACCURACY = global_manager.update_bezier_accuracy()
+t_values = global_manager.calculate_t_array()
+
+active_glyphs = [None, None]
+current_glyph_mapping = None
+current_glyph_mapping_is_valid = False
+lerped_glyph = None
+
+
+# Runtime control variables
+pygame.init()
+screen = pygame.display.set_mode(SCREEN_DIMENSIONS)
+clock = pygame.time.Clock()
+cursor = cursor.Cursor()
+toolbar = None
+manager = None
+
+origin = pygame.math.Vector2(0, 0)
+selected_objects = []
+abstract_points = []
+curves = []
+contours = []
+glyphs = []
+glyph_mappings = {}            # a dictionary of key:value pairs (g1, g2): [custom_map, reduction_map, insertion_map]
+
 

@@ -31,12 +31,12 @@ clock = globvar.clock
 cursor = globvar.cursor
 
 manager = global_manager.GlobalManager()
+globvar.manager = manager
 
 origin = globvar.origin
 curves = globvar.curves
 toolbar = toolbar.Toolbar()
-
-manager.calculate_t_array()
+globvar.toolbar = toolbar
 
 line_width = 3
 base_scale = 1
@@ -78,8 +78,8 @@ test_glyphs = []
 
 
 
-extracted_h1_data = ttfConverter.test_font_load("o", test_fonts[0])
-extracted_h2_data = ttfConverter.test_font_load("o", test_fonts[1])
+extracted_h1_data = ttfConverter.test_font_load("p", test_fonts[0])
+extracted_h2_data = ttfConverter.test_font_load("p", test_fonts[1])
 test_h = glyph.Glyph()
 test_i = glyph.Glyph()
 for cnt in extracted_h1_data:
@@ -88,6 +88,7 @@ for cnt in extracted_h1_data:
 test_h.worldspace_scale_by(0.1)
 test_h.worldspace_offset_by(np.array([w/4, h/2]))
 test_h.update_bounds()
+test_h.sort_contours_by_fill()
 # test_h.worldspace_offset_by(-test_h.get_center_world())
 
 # test_i = test_h.copy()
@@ -98,7 +99,15 @@ for cnt in extracted_h2_data:
 test_i.worldspace_scale_by(0.12)
 test_i.worldspace_offset_by(np.array([w*3/4, h/2]))
 test_i.update_bounds()
+test_i.sort_contours_by_fill()
+
+# test_g1 = test_h.copy()
+# test_g2 = test_i.copy()
+# test_g1.worldspace_offset_by(-test_h.get_center_world())
+# test_g2.worldspace_offset_by(-test_i.get_center_world())
 # test_i.worldspace_offset_by(-test_i.get_center_world())
+
+global_manager.set_active_glyphs(test_h, test_i)
 
 
 
@@ -186,10 +195,10 @@ circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_
 
 mixed_glyph = None
 mappings = None
-mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
+# mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
 
 
-mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
+# mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
 
 not_scrolling = True
 
@@ -238,17 +247,15 @@ while running:
     not_scrolling = np.all(np.isclose(globvar.mouse_scroll_directions, globvar.empty_offset))
     just_stopped_scrolling = not_scrolling and not last_not_scrolling
 
-    # synchronize Cursor object with inputs
-    cursor.update_mouse_variables()
-    cursor.step(point_radius)
+    manager.step()
     panned_camera = cursor.panned_this_frame
 
 
     # if there were zoom updates, get update the bezier accuracy and get new t values
     if just_stopped_scrolling:
-        manager.update_bezier_accuracy()
+        global_manager.update_bezier_accuracy()
         if globvar.BEZIER_ACCURACY != prev_accuracy:
-            manager.calculate_t_array()
+            global_manager.calculate_t_array()
 
     # update Bezier curves in response to any points which changed
     for curve in globvar.curves:
@@ -265,19 +272,22 @@ while running:
 
 
     # Reset the mixed contour on display
-    if mixed_glyph is not None:
-        mixed_glyph.destroy()
-        mixed_glyph = None
+    if globvar.lerped_glyph is not None:
+        print("Destroying previous lerped_glyph")
+        globvar.lerped_glyph.destroy()
+        globvar.lerped_glyph = None
 
     for g in globvar.glyphs:
         g.update_bounds()
 
 
     # Remix the glyph
-    if mappings is not None:
+    if globvar.current_glyph_mapping_is_valid:
         mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-        mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, mix_t)
-        mixed_glyph.worldspace_offset_by(np.array([w/2, h/2]))
+        g1, g2 = globvar.active_glyphs
+        globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_mapping, mix_t)
+        globvar.lerped_glyph.worldspace_offset_by(np.array([w/2, h*0.75]))
+        globvar.lerped_glyph.update_bounds()
 
 
 
@@ -291,7 +301,8 @@ while running:
     corner_rad = 3
     pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
-    mixed_glyph.draw(screen, point_radius)
+    if globvar.lerped_glyph is not None:
+        globvar.lerped_glyph.draw(screen, point_radius)
     # for g in test_glyphs:
     #     g.draw(screen, point_radius, [0, 0])
 
@@ -299,8 +310,8 @@ while running:
     test_h.draw(screen, point_radius)
     test_i.draw(screen, point_radius)
 
-    if mappings is not None:
-        manager.draw_mapping_reduction(screen, test_h, test_i, mappings)
+    if globvar.show_current_glyph_mapping:
+        manager.draw_mapping_reduction(screen)
 
     # GUI drawing
     cursor.draw(screen)
@@ -315,11 +326,12 @@ while running:
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
                           "Bezier Accuracy " + str(globvar.BEZIER_ACCURACY),
-                          "Framerate: " + str(round(clock.get_fps(), 4)),
                           "Mouse position: " + str(np.round(mouse_pos, 3)),
                           "Mouse position in world: " + str(np.round(cursor.screen_to_world_space(mouse_pos), 3)),
                           "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
-                          "Mapping: " + str(mappings)]
+                          "Global Manager State: " + str(manager.state),
+                          # "All Mappings: " + str(globvar.glyph_mappings)]
+                          "Glyph Mapping: " + str(globvar.current_glyph_mapping)]
         for i, message in enumerate(debug_messages):
             text_rect = pygame.Rect(0, 0, w/4, h)
             debug_text_surface = fonts.multiLineSurface(message, fonts.FONT_DEBUG, text_rect, colors.BLACK)

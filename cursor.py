@@ -69,6 +69,8 @@ class Cursor(object):
 
         if self.panning:
             self.step_pan()
+
+        self.check_toolbar_hover()
         return
 
     def step_normal(self, point_radius):
@@ -100,7 +102,8 @@ class Cursor(object):
             if selected_point.check_mouse_hover(point_radius, self.mouse_pos):
                 hovered_point = selected_point
 
-        if hovered_point is None:
+        # only bother checking if points can be dragged around if they're even shown
+        if hovered_point is None and globvar.show_extra_curve_information:
             # only check points if you're available to select
             for point in globvar.abstract_points:
                 if point.check_mouse_hover(point_radius, self.mouse_pos):
@@ -133,6 +136,11 @@ class Cursor(object):
             globvar.CAMERA_OFFSET[0] -= delta_x / globvar.CAMERA_ZOOM
             globvar.CAMERA_OFFSET[1] -= delta_y / globvar.CAMERA_ZOOM
         return
+
+    def check_toolbar_hover(self):
+        toolbar = globvar.toolbar
+        for b in toolbar.buttons:
+            b.check_mouse_hover(self.mouse_pos, self.mouse_click_left)
 
     def draw(self, surface):
         if self.multiselecting:

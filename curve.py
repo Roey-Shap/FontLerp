@@ -2,8 +2,10 @@ import numpy as np
 import pygame
 import custom_colors
 import global_variables as globvar
+import global_manager
 import point as AbsPoint
 import copy
+import custom_math
 
 """ 
 Represents a 2D Bezier curve
@@ -168,13 +170,25 @@ class Bezier(Curve):
 
         self.bernstein_points = None
         self.tween_points = None
+        self.worldspace_tween_points = None
 
         self.worldspace_points = worldspace_points
         self.update_points()
         return
 
 
-    def get_length(self):
+    def get_length_world(self):
+        sigma = 0
+        num_render_points = len(self.worldspace_tween_points)
+        for i in range(num_render_points-1):
+            p1 = self.worldspace_tween_points[i]
+            p2 = self.worldspace_tween_points[i+1]
+            sigma += np.linalg.norm(p1-p2)
+
+        return sigma
+
+
+    def get_length_camera(self):
         sigma = 0
         num_render_points = len(self.tween_points)
         for i in range(num_render_points-1):
@@ -202,6 +216,7 @@ class Bezier(Curve):
         # (2xn) = (2xn)*(nxn)
         self.bernstein_points = np.matmul(self.cameraspace_points.T, self.adjustment_matrix)
         self.calc_tween_points()
+        self.worldspace_tween_points = custom_math.camera_to_worldspace(self.tween_points)
         self.average_point = np.average(self.cameraspace_points, axis=0)
         return
 
@@ -221,7 +236,7 @@ class Bezier(Curve):
             colors = input_colors
         self.draw_tween_lines(surface, colors[1], width=width)
 
-        if globvar.DEBUG:
+        if globvar.show_extra_curve_information:
             self.draw_control_lines(surface, colors[0], width=width)
             self.draw_control_points(surface, colors[2], radius=point_radius)
 

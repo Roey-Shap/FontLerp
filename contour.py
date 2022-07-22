@@ -14,15 +14,6 @@ import custom_colors
 import custom_math
 import copy
 
-import operator as op
-from functools import reduce
-
-def ncr(n, r):
-    r = min(r, n-r)
-    numer = reduce(op.mul, range(n, n-r, -1), 1)
-    denom = reduce(op.mul, range(1, r+1), 1)
-    return numer // denom
-
 
 class FILL(int):
     OUTLINE = 0
@@ -177,9 +168,14 @@ class Contour(object):
         return globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD - len(self)
 
 
+    def get_length_worldspace(self):
+        return sum(c.get_length_world() for c in self.curves)
+
+
     # TODO
     def remove_curve(self, curve):
         return
+
 
     # TODO
     def pop_last_curve(self):
@@ -206,14 +202,15 @@ class Contour(object):
         return
 
 # Drawing
-    def draw(self, surface, radius, color_gradient=True, width=1):
+    def draw(self, surface, radius, color=None, width=1):
         # draw curves in colors corresponding to their order in this contour
+        no_input_color = color is None
         for i, curve in enumerate(self.curves):
-            if color_gradient:
-                input_colors = [custom_colors.LT_GRAY,
+            if no_input_color:
+                color = [custom_colors.LT_GRAY,
                                 custom_colors.mix_color(custom_colors.GREEN, custom_colors.RED, (i+1)/(len(self)+1)),
                                 custom_colors.GRAY]
-            curve.draw(surface, radius, input_colors, width=width)
+            curve.draw(surface, radius, color, width=width)
 
         # draw debug information (center, etc.)
         if globvar.DEBUG:
@@ -274,6 +271,24 @@ def calc_curve_score_MSE(curve1, curve2):
     return -(np.sum((c1_tween_points - c2_tween_points) ** 2) / len(c1_tween_points))
 
 
+def maximal_curves_for_threshold(n1, n2, threshold):
+    # basically performs a binary search on the scale of the choose function
+    prev_ncr = custom_math.ncr(n1, n2)
+    cur_top_val = round(0.5 * (n1 + 2))       # start from the average value
+    largest_valid_top_val = n2
+    visited_top_values = []
+    while prev_ncr > 1:
+        prev_ncr = custom_math.ncr(cur_top_val, n2)
+        if prev_ncr > threshold:        # go lower
+            cur_top_val = round(0.5 * (cur_top_val + n2))
+        else:                           # go higher
+            largest_valid_top_val = max(largest_valid_top_val, cur_top_val)
+            cur_top_val = round(0.5 * (n1 + cur_top_val))
+        if cur_top_val in visited_top_values:
+            return largest_valid_top_val
+        visited_top_values.append(cur_top_val)
+
+
 
 """
 Let C1 be the contour with more curves and C2 that with less.
@@ -312,11 +327,12 @@ def find_ofer_min_mapping(contour1, contour2):
     # crucially, it maintains the order of those elements
     index_subsets = itertools.combinations(range(n1), n2)  # returns all sets of indices in [0, n-1] of size n2
     range_n2 = list(range(n2))
-    outer_iterations = ncr(n1, n2)
+    outer_iterations = custom_math.ncr(n1, n2)
     print("Number of index subsets is:", outer_iterations)
+    did_it = False
+    maximal_tolerable_iterations = 25000
 
-    # TODO Remove this limit - maybe categorize greedily the curve-pairs which show the strongest promise of being good?
-    if outer_iterations > 25000:
+    if outer_iterations > maximal_tolerable_iterations:
         print("Warning: number of possible mappings is too high to find optimal mapping; using greedy method")
 
         """
@@ -341,95 +357,113 @@ def find_ofer_min_mapping(contour1, contour2):
 
         # calculate scores
         scores = {}
+        average_c1_scores = {}
         for c1_index in range(n1):
+            average_score = 0
             c1_curve = contour1.curves[c1_index]
             for c2_index in range_n2:
                 c2_curve = contour2.curves[c2_index]
-                scores[(c1_index, c2_index)] = calc_curve_score_MSE(c1_curve, c2_curve)
+                score = calc_curve_score_MSE(c1_curve, c2_curve)
+                average_score += score
+                scores[(c1_index, c2_index)] = score
+            average_score /= n2
+            average_c1_scores[c1_index] = average_score
 
-        scores = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1], reverse=True)}
-        print(scores)
-        # different method interrupting here: find the highest-scoring mapping for each of C2's curves
-        # taken_c1_curves = []
-        # cur_score = 0
+        sorted_c1_scores = custom_math.sort_dictionary(average_c1_scores, 1, reverse=True)
+
+        sufficient_curves = maximal_curves_for_threshold(n1, n2, maximal_tolerable_iterations)
+        best_c1_indices = []
+        for i, key in enumerate(sorted_c1_scores):
+            if i < sufficient_curves:
+                best_c1_indices.append(key)
+
+        index_subsets = itertools.combinations(best_c1_indices, n2)
+        did_it = True
+        outer_iterations = custom_math.ncr(sufficient_curves, n2)
+        #
+        # scores = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1], reverse=True)}
+        # print(scores)
+        # # different method interrupting here: find the highest-scoring mapping for each of C2's curves
+        # # taken_c1_curves = []
+        # # cur_score = 0
+        # # for c2_index in range_n2:
+        # #     for i, curve_pair in enumerate(scores.keys()):
+        # #         if curve_pair[1] == c2_index and curve_pair[0] not in taken_c1_curves:
+        # #             taken_c1_curves.append(curve_pair[0])
+        # #             cur_score += scores[curve_pair]
+        # # return [taken_c1_curves, range_n2.copy()], cur_score
+        #
+        # best_score = -math.inf
+        # best_mapping = []
+        # # begin by picking a C2 curve to give "priority to" (be the starting point)
         # for c2_index in range_n2:
-        #     for i, curve_pair in enumerate(scores.keys()):
-        #         if curve_pair[1] == c2_index and curve_pair[0] not in taken_c1_curves:
-        #             taken_c1_curves.append(curve_pair[0])
-        #             cur_score += scores[curve_pair]
-        # return [taken_c1_curves, range_n2.copy()], cur_score
-
-        best_score = -math.inf
-        best_mapping = []
-        # begin by picking a C2 curve to give "priority to" (be the starting point)
-        for c2_index in range_n2:
-            # try to build a list of the best-scored pairs that follow cyclic order of the curves in their contours
-            # find the best-scored pair using c2_index
-            tolerance = 1000                              # describes how many places down you're willing to go
-            tolerance_step = 2                           # to find a starting point for a given starting c2_index
-            for t in range(0, tolerance, tolerance_step):
-                tolerance_countdown = 0
-
-                current_total_score = 0
-                current_mapping_indices = []
-                current_mapping_offset = c2_index
-
-                current_pair_index = 0
-                first_c1_chosen = -1
-                first_c2_chosen = c2_index
-                last_c1_chosen = -1
-                last_c2_chosen = c2_index
-                yet_wrapped = False
-
-                for i, curve_pair in enumerate(scores.keys()):
-                    if curve_pair[1] == c2_index:
-                        tolerance_countdown += 1
-                        if tolerance_countdown >= t:
-                            first_c1_chosen = curve_pair[0]
-                            first_c2_chosen = curve_pair[1]
-                            last_c1_chosen = curve_pair[0]
-                            last_c2_chosen = curve_pair[1]
-                            current_pair_index = i
-                            current_total_score += scores[curve_pair]
-                            current_mapping_indices.append(last_c1_chosen)
-                            break
-
-                # go over the remaining curves and find the best one that complies with the order
-                curve_pairs_list = list(scores.keys())
-                curves_mapped = 1                                                           # just the initial c2_curve was found
-                iterations = 0
-                while curves_mapped < n2 and iterations < len(curve_pairs_list):
-                    iterations += 1
-                    current_pair_index = (current_pair_index + 1) % len(curve_pairs_list)   # we start at current_pair_index so immediately increment
-                    curve_pair = curve_pairs_list[current_pair_index]
-                    cur_c1_curve, cur_c2_curve = curve_pair
-
-                    curve_is_earlier_in_contour = cur_c1_curve < first_c1_chosen and not yet_wrapped
-                    curve_is_later_in_contour = cur_c1_curve > last_c1_chosen
-                    wrapped_and_is_later = yet_wrapped and curve_is_later_in_contour and cur_c1_curve < first_c1_chosen
-                    no_wrap_and_is_later = (not yet_wrapped) and curve_is_later_in_contour
-                    valid_c1_index = curve_is_earlier_in_contour or wrapped_and_is_later or no_wrap_and_is_later
-                    valid_c2_index = cur_c2_curve == ((last_c2_chosen + 1) % n2)
-
-                    if valid_c1_index and valid_c2_index:
-                        if cur_c1_curve < first_c1_chosen:
-                            yet_wrapped = True
-
-                        last_c1_chosen = cur_c1_curve
-                        last_c2_chosen = cur_c2_curve
-                        curves_mapped += 1
-                        current_total_score += scores[curve_pair]
-                        current_mapping_indices.append(last_c1_chosen)
-
-                print(c2_index, current_mapping_indices, "with", curves_mapped, "curves mapped")
-                # we've found this potential mapping; is its total score high enough?
-                if current_total_score > best_score and curves_mapped == n2:
-                    best_score = current_total_score
-                    current_mapping_indices.sort()
-                    best_mapping = [current_mapping_indices, current_mapping_offset]
-
-        # print("Unoptimal OMin mapping found!")
-        return best_mapping, best_score
+        #     # try to build a list of the best-scored pairs that follow cyclic order of the curves in their contours
+        #     # find the best-scored pair using c2_index
+        #     tolerance = 1000                              # describes how many places down you're willing to go
+        #     tolerance_step = 2                           # to find a starting point for a given starting c2_index
+        #     for t in range(0, tolerance, tolerance_step):
+        #         tolerance_countdown = 0
+        #
+        #         current_total_score = 0
+        #         current_mapping_indices = []
+        #         current_mapping_offset = c2_index
+        #
+        #         current_pair_index = 0
+        #         first_c1_chosen = -1
+        #         first_c2_chosen = c2_index
+        #         last_c1_chosen = -1
+        #         last_c2_chosen = c2_index
+        #         yet_wrapped = False
+        #
+        #         for i, curve_pair in enumerate(scores.keys()):
+        #             if curve_pair[1] == c2_index:
+        #                 tolerance_countdown += 1
+        #                 if tolerance_countdown >= t:
+        #                     first_c1_chosen = curve_pair[0]
+        #                     first_c2_chosen = curve_pair[1]
+        #                     last_c1_chosen = curve_pair[0]
+        #                     last_c2_chosen = curve_pair[1]
+        #                     current_pair_index = i
+        #                     current_total_score += scores[curve_pair]
+        #                     current_mapping_indices.append(last_c1_chosen)
+        #                     break
+        #
+        #         # go over the remaining curves and find the best one that complies with the order
+        #         curve_pairs_list = list(scores.keys())
+        #         curves_mapped = 1                                                           # just the initial c2_curve was found
+        #         iterations = 0
+        #         while curves_mapped < n2 and iterations < len(curve_pairs_list):
+        #             iterations += 1
+        #             current_pair_index = (current_pair_index + 1) % len(curve_pairs_list)   # we start at current_pair_index so immediately increment
+        #             curve_pair = curve_pairs_list[current_pair_index]
+        #             cur_c1_curve, cur_c2_curve = curve_pair
+        #
+        #             curve_is_earlier_in_contour = cur_c1_curve < first_c1_chosen and not yet_wrapped
+        #             curve_is_later_in_contour = cur_c1_curve > last_c1_chosen
+        #             wrapped_and_is_later = yet_wrapped and curve_is_later_in_contour and cur_c1_curve < first_c1_chosen
+        #             no_wrap_and_is_later = (not yet_wrapped) and curve_is_later_in_contour
+        #             valid_c1_index = curve_is_earlier_in_contour or wrapped_and_is_later or no_wrap_and_is_later
+        #             valid_c2_index = cur_c2_curve == ((last_c2_chosen + 1) % n2)
+        #
+        #             if valid_c1_index and valid_c2_index:
+        #                 if cur_c1_curve < first_c1_chosen:
+        #                     yet_wrapped = True
+        #
+        #                 last_c1_chosen = cur_c1_curve
+        #                 last_c2_chosen = cur_c2_curve
+        #                 curves_mapped += 1
+        #                 current_total_score += scores[curve_pair]
+        #                 current_mapping_indices.append(last_c1_chosen)
+        #
+        #         print(c2_index, current_mapping_indices, "with", curves_mapped, "curves mapped")
+        #         # we've found this potential mapping; is its total score high enough?
+        #         if current_total_score > best_score and curves_mapped == n2:
+        #             best_score = current_total_score
+        #             current_mapping_indices.sort()
+        #             best_mapping = [current_mapping_indices, current_mapping_offset]
+        #
+        # # print("Unoptimal OMin mapping found!")
+        # return best_mapping, best_score
 
     # END UNOPTIMAL CASE ====================================
         # random_indices = random.sample(list(range(n1)), n2)
@@ -444,7 +478,10 @@ def find_ofer_min_mapping(contour1, contour2):
         # return [random_indices, random_offset], current_mapping_score
 
     # START OPTIMAL CASE ====================================
-    for indices_set_index, indices in enumerate(index_subsets):
+    if did_it:
+        print("Completed filtering to less curves: New Outer-iters:", outer_iterations)
+
+    for indices in index_subsets:
         # iterate through all offsets
         for offset in range_n2:
             # use the offset by iterating through all placements

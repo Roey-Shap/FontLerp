@@ -2,6 +2,8 @@ import numpy as np
 import pygame
 import global_variables as globvar
 
+import operator as op
+from functools import reduce
 
 """
 Maps a value in [pre_min, pre_max] to another in [post_min, post_max]
@@ -10,6 +12,14 @@ from https://www.reddit.com/r/gamemaker/comments/6nk3us/help_is_there_a_gamemake
 def map(value, pre_min, pre_max, post_min, post_max):
     prop = (value - pre_min) / (pre_max - pre_min);
     return (prop * (post_max - post_min)) + post_min;
+
+
+def ncr(n, r):
+    r = min(r, n-r)
+    numer = reduce(op.mul, range(n, n-r, -1), 1)
+    denom = reduce(op.mul, range(1, r+1), 1)
+    return numer // denom
+
 
 
 def interpolate_np(ndarr1, ndarr2, t):
@@ -41,8 +51,8 @@ def weighted(nb):
         return nb
 
 
-def sort_dictionary(dictionary, by_key_or_value=0):
-    return {k: v for k, v in sorted(dictionary.items(), key=lambda item: weighted(item[by_key_or_value]))}
+def sort_dictionary(dictionary, by_key_or_value=0, reverse=False):
+    return {k: v for k, v in sorted(dictionary.items(), key=lambda item: weighted(item[by_key_or_value]), reverse=reverse)}
 
 def get_keys_from_value(d, val):
     return [k for k, v in d.items() if v == val]
