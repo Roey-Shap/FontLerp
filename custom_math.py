@@ -59,6 +59,14 @@ def get_keys_from_value(d, val):
     return [k for k, v in d.items() if v == val]
 
 
+def unique_string_values(text):
+    unique_characters = ""
+    for character in text:
+        if character not in unique_characters and character != ' ':
+            unique_characters += character
+    return unique_characters
+    # return "".join(set(text))
+
 """
 Returns +1 if the points move in clockwise fashion and -1 if they move in counter-clockwise fashion
 """

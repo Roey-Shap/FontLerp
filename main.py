@@ -48,13 +48,21 @@ w, h = globvar.SCREEN_DIMENSIONS
 glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS)
 
 
-
-
 # extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
 # extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
 #
 
 test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
+
+test_text = "Through the wawa"
+print(custom_math.unique_string_values(test_text))
+test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, test_fonts[0], test_fonts[1])
+for g in test_lerped_glyphs:
+    g.worldspace_scale_by(0.1)
+    g.worldspace_offset_by(np.array([0, h/2]))
+
+
+
 test_glyphs = []
 #
 # for i, font in enumerate(test_fonts):
@@ -286,11 +294,12 @@ while running:
 
     # Remix the glyph
     if globvar.current_glyph_mapping_is_valid:
-        mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-        g1, g2 = globvar.active_glyphs
-        globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_mapping, mix_t)
-        globvar.lerped_glyph.worldspace_offset_by(np.array([w/2, h*0.75]))
-        globvar.lerped_glyph.update_bounds()
+        a = 1
+        # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
+        # g1, g2 = globvar.active_glyphs
+        # globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_mapping, mix_t)
+        # globvar.lerped_glyph.worldspace_offset_by(np.array([w/2, h*0.75]))
+        # globvar.lerped_glyph.update_bounds()
 
 
 
@@ -310,8 +319,11 @@ while running:
     #     g.draw(screen, point_radius, [0, 0])
 
 
-    test_h.draw(screen, point_radius)
-    test_i.draw(screen, point_radius)
+    # test_h.draw(screen, point_radius)
+    # test_i.draw(screen, point_radius)
+
+    global_manager.draw_lerped_text(screen, test_lerped_glyphs)
+
 
     if globvar.show_current_glyph_mapping:
         manager.draw_mapping_reduction(screen)

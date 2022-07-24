@@ -232,23 +232,23 @@ class Glyph(object):
             if True:
                 pnts_dict = contour.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
                                                                     return_relative_to_upper_left_curve=True)
+                if False:
+                    for i, pair in enumerate(pnts_dict.items()):
+                        curve_index, pnts = pair
+                        num_pnts = len(pnts)
+                        for adj_index, coords in pnts:
+                            camera_coords = custom_math.world_to_cameraspace(coords)
+                            camera_coords = (camera_coords[0], camera_coords[1])
+                            # print(camera_coords)
 
-                for i, pair in enumerate(pnts_dict.items()):
-                    curve_index, pnts = pair
-                    num_pnts = len(pnts)
-                    for adj_index, coords in pnts:
-                        camera_coords = custom_math.world_to_cameraspace(coords)
-                        camera_coords = (camera_coords[0], camera_coords[1])
-                        # print(camera_coords)
-                        if adj_index == 0:
                             tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
                             globvar.screen.blit(tsurf, tpos)
-                        # pygame.draw.circle(globvar.screen, (0, 255 * i/num_pnts, 0), custom_math.world_to_cameraspace(p), 3)
+                            # pygame.draw.circle(globvar.screen, (0, 255 * i/num_pnts, 0), custom_math.world_to_cameraspace(p), 3)
                     # if i == round(time.time()) % len(contour):
                     #
                     #     break
 
-        if globvar.DEBUG:
+        if globvar.show_extra_curve_information:
             # pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius)
             # pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius)
             pygame.draw.circle(surface, custom_colors.RED, self.get_center_camera(), radius)
@@ -278,7 +278,14 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
     n2 = len(glyph2)
 
     if n2 > n1:
-        raise AttributeError("Glyph 1 needs to have at least as many curves as Glyph 2")
+        # raise AttributeError("Glyph 1 needs to have at least as many curves as Glyph 2")
+        temp = glyph1
+        glyph1 = glyph2
+        glyph2 = temp
+
+    n1 = len(glyph1)
+    n2 = len(glyph2)
+
     g1_closure = glyph1.check_all_contours_closed()
     g2_closure = glyph2.check_all_contours_closed()
 
@@ -362,6 +369,13 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
 
 
 def lerp_glyphs(glyph1, glyph2, mappings, t, debug_info=False):
+    n1 = len(glyph1)
+    n2 = len(glyph2)
+    if n2 > n1:
+        temp = glyph1
+        glyph1 = glyph2
+        glyph2 = temp
+
     lerped_glpyh = Glyph()
     n1 = len(glyph1)
     n2 = len(glyph2)

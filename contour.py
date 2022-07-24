@@ -207,8 +207,8 @@ class Contour(object):
 
         resultant_points = []
         curves_and_points = {index: [] for index in range(len(self))}
-        if self.fill == FILL.ADD:
-            print(len(curves_and_points))
+        # if self.fill == FILL.ADD:
+        #     print(len(curves_and_points))
 
         contour_length_worldspace = self.get_length_worldspace()
 
@@ -343,7 +343,7 @@ class Contour(object):
             curve.draw(surface, radius, color, width=width)
 
         # draw debug information (center, etc.)
-        if globvar.DEBUG:
+        if globvar.show_extra_curve_information:
             a = 1
             # center = self.get_center()
             # debug_alpha = 0.3

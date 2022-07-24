@@ -3,18 +3,19 @@ https://stackoverflow.com/questions/40437308/retrieving-bounding-box-and-bezier-
 """
 
 import ttfquery
-import ttfquery.glyph as glyph
+import ttfquery.glyph
 import curve
 import contour
 import numpy as np
 import global_variables as globvar
+import glyph
 
 def test_font_load(char, ttf_file_name):
     # print("Font import information")
 
     font_url = "Test_Fonts/" + ttf_file_name
     font = ttfquery.describe.openFont(font_url)
-    g = glyph.Glyph(ttfquery.glyphquery.glyphName(font, char))
+    g = ttfquery.glyph.Glyph(ttfquery.glyphquery.glyphName(font, char))
     g_contours = g.calculateContours(font)
 
 # from http://ttfquery.sourceforge.net/_modules/ttfquery/glyph.html#integrateQuadratic
@@ -96,3 +97,14 @@ def convert_quadratic_flagged_points_to_contour(flagged_points):
 
     cont.update_bounds()
     return cont
+
+def glyph_from_font(char, font_file_name):
+    g = glyph.Glyph()
+    extracted_font_data = test_font_load(char, font_file_name)
+    for cnt in extracted_font_data:
+        formatted_contour = convert_quadratic_flagged_points_to_contour(cnt)
+        formatted_contour.update_bounds()
+        g.append_contour(formatted_contour)
+
+    g.sort_contours_by_fill()
+    return g

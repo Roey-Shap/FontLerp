@@ -1,9 +1,11 @@
+import custom_math
 import global_variables as globvar
 import numpy as np
 import pygame
 import custom_colors
 import ptext
 import glyph
+import ttfConverter
 
 class GlobalManager(object):
     class State(int):
@@ -169,3 +171,50 @@ def calculate_t_array():
                                   (i / globvar.BEZIER_ACCURACY), 1] for i in range(globvar.BEZIER_ACCURACY + 1)],
                                 dtype=globvar.POINT_NP_DTYPE)
     return globvar.t_values
+
+
+def get_glyphs_from_text(text, font1, font2):
+    string_length = len(text)
+
+    # first find how many mappings we need; one for each character present in the text
+    characters_in_text = custom_math.unique_string_values(text)
+    character_mappings = {}
+
+    widest_glyph_width = 0
+    for char in characters_in_text:
+        print("Finding mapping for:", char)
+        print(char)
+        g1 = ttfConverter.glyph_from_font(char, font1)
+        g2 = ttfConverter.glyph_from_font(char, font2)
+
+        widest_glyph_width = max(widest_glyph_width, g1.width, g2.width)
+
+        char_mapping, score = glyph.find_glyph_null_contour_mapping(g1, g2)
+        character_mappings[char] = (g1, g2, char_mapping)
+
+    between_character_buffer = 30
+    current_draw_x = 0
+    current_draw_y = 0
+    lerped_glyphs = []
+    # now we have all of the mappings we need - let's generate the text one character at a time
+    for i, char in enumerate(text):
+        t = i / string_length
+        if char == ' ':
+            current_draw_x += widest_glyph_width
+        else:
+            # get mapping info
+            g1, g2, char_mapping = character_mappings[char]
+
+            # generate the correct tween-glyph and move the draw_x accordingly
+            lerped_glyph = glyph.lerp_glyphs(g1, g2, char_mapping, t)
+            lerped_glyph.worldspace_offset_by(np.array([current_draw_x, current_draw_y]))
+            lerped_glyph.update_bounds()
+            lerped_glyphs.append(lerped_glyph)
+            current_draw_x += lerped_glyph.width + between_character_buffer
+
+    return lerped_glyphs
+
+def draw_lerped_text(surface, lerped_glyphs):
+    for g in lerped_glyphs:
+        g.draw(surface, globvar.POINT_DRAW_RADIUS)
+    return
