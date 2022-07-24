@@ -31,6 +31,7 @@ class Contour(object):
         self.em_origin = globvar.empty_offset.copy()
 
         self.fill = FILL.ADD
+        self.starting_curve = 0
 
         globvar.contours.append(self)
         return
@@ -201,7 +202,136 @@ class Contour(object):
             # print("rel angle:", cur_curve_rel_angle)
         return
 
-# Drawing
+    def get_equally_spaced_points_along(self, num_points,
+                                        return_relative_to_upper_left_curve=False):
+
+        resultant_points = []
+        curves_and_points = {index: [] for index in range(len(self))}
+        if self.fill == FILL.ADD:
+            print(len(curves_and_points))
+
+        contour_length_worldspace = self.get_length_worldspace()
+
+        # we know how much distance should be between each point
+        dis_between_points = contour_length_worldspace / num_points
+
+        num_curves = len(self)
+        self_upper_left = self.get_upper_left_world()
+
+        # now find these points by walking along the contour and add their values to the average
+        curve_index = 0
+        curve_obj = self.curves[curve_index]
+        point_index = 0
+        point = curve_obj.worldspace_tween_points[point_index]
+
+        prev_point = point
+        between_tween_points = []
+        num_tween_points = curve_obj.worldspace_tween_points.shape[0]
+
+        curve_with_upper_left_point = 0
+        upper_left_point = point
+        upper_left_point_len = np.linalg.norm(point - self_upper_left)
+
+        point_index += 1
+
+        for p in range(num_points):
+            distance_remaining = dis_between_points
+
+            # continue until you have no distance left or no curves left in the contour
+            while distance_remaining > 0 and curve_index < num_curves:
+                prev_point = point
+                # walk along the next piece of the curve
+                # if you've reached the end of this curve, move to next curve
+                if point_index == num_tween_points:
+                    point_index = 0
+                    curve_index += 1
+                    if curve_index == num_curves:
+                        break
+                    curve_obj = self.curves[curve_index]
+                    num_tween_points = curve_obj.worldspace_tween_points.shape[0]
+
+                if len(between_tween_points) == 0:
+                    point = curve_obj.worldspace_tween_points[point_index]
+                else:
+                    point = between_tween_points.pop()
+
+                distance_travelled = np.linalg.norm(point - prev_point)
+
+                # if you don't need to use all of that distance, only use some of it
+                if distance_travelled > distance_remaining:
+                    # make the current point the in between point
+                    # we know how long we have to go and what line we're walking along
+                    fraction_travelled = (distance_travelled - distance_remaining) / distance_travelled
+                    actual_end_point = point
+                    point = (point * (1 - fraction_travelled)) + (fraction_travelled * prev_point)
+
+                    distance_travelled = distance_remaining  # for the distance_remaining -= dist_travelled calc
+                    between_tween_points.append(actual_end_point)  # store this as an irregular point
+
+
+                distance_remaining -= distance_travelled
+
+                if len(between_tween_points) == 0:
+                    point_index += 1
+
+
+            # get the distance from the point to the contour's upper left corner
+            point_len = np.linalg.norm(point - self_upper_left)
+            if point_len < upper_left_point_len:
+                upper_left_point = point
+                upper_left_point_len = point_len
+                curve_with_upper_left_point = curve_index % num_curves
+
+            # if globvar.show_extra_curve_information:
+            #     print(upper_left_point)
+
+            # if you ran out of curves in the contour and have distance left,
+            # the point naturally gets placed at the end, which is a good solution to that edge-case
+            resultant_points.append(point)
+            if return_relative_to_upper_left_curve:
+                curves_and_points[(curve_index % num_curves)].append((p, point))
+
+            # pygame.draw.circle(globvar.screen, (0, 255 * p / num_points, 0),
+            #                    custom_math.world_to_cameraspace(point),
+            #                    3)
+
+
+        result = resultant_points
+
+        # anchor = np.array(self.get_lower_right_world()[0], self.get_upper_left_world()[1])
+        anchor = self.get_lower_right_world()
+        if return_relative_to_upper_left_curve:
+
+            # get the curve with smallest min squared error to upper left point
+            lowest_MSE = math.inf
+            upper_leftest_curve = 0
+            for curve_index in range(num_curves):
+                pnts = [coords for index, coords in curves_and_points[curve_index]]
+                if len(pnts) > 0:
+                    MSE = sum(np.linalg.norm(anchor - coords) for coords in pnts) / len(pnts)
+                    if MSE < lowest_MSE:
+                        upper_leftest_curve = curve_index
+                        lowest_MSE = MSE
+
+        #     print(upper_leftest_curve)
+        #     print(curves_and_points)
+        #     print("starting curve:", self.starting_curve)
+        #     print("now both", curves_and_points[self.starting_curve])
+            first_index_in_up_left, first_coords_in_up_left = curves_and_points[upper_leftest_curve][0]
+
+            adjusted_points_in_curve_groups = {}
+            for pair in curves_and_points.items():
+                curve_index, points_group = pair
+                adjusted_index = (curve_index - curve_with_upper_left_point) % num_curves
+                adjusted_points_group = [((p_index - first_index_in_up_left) % num_points, p_coords) for p_index, p_coords in
+                                         points_group]
+                adjusted_points_in_curve_groups[adjusted_index] = adjusted_points_group
+
+            result = adjusted_points_in_curve_groups
+
+        return result
+
+    # Drawing
     def draw(self, surface, radius, color=None, width=1):
         # draw curves in colors corresponding to their order in this contour
         no_input_color = color is None
@@ -222,8 +352,8 @@ class Contour(object):
             # s.fill(custom_colors.RED)
             # surface.blit(s, center - radius)
 
-            # pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius*0.75)
-            # pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius*0.75)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius*0.75)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius*0.75)
         return
 
     def draw_filled_polygon(self, surface, fill_color, width=1):
@@ -289,6 +419,9 @@ def maximal_curves_for_threshold(n1, n2, threshold):
         visited_top_values.append(cur_top_val)
 
 
+    # should never reach here
+    return n2
+
 
 """
 Let C1 be the contour with more curves and C2 that with less.
@@ -297,7 +430,90 @@ the mapping of lines in C2 to those in C1 which are determined to be most releva
 in the form [indices of c1 to take, offset of c2 to use]
 """
 
-def find_ofer_min_mapping(contour1, contour2):
+def find_ofer_min_mapping(contour1: Contour, contour2: Contour):
+    if contour1.fill != contour2.fill:
+        return None, -math.inf
+
+
+    if len(contour2) > len(contour1):
+        temp = contour1
+        contour1 = contour2
+        contour2 = temp
+
+    n1 = len(contour1)
+    n2 = len(contour2)
+    contours = [contour1, contour2]
+
+    # find the mapping by matching points from n2 into n1
+    # given a curve in n2, pick the curve in c1 who the majority of its points fall into
+
+    equidistant_points_dicts = []
+    # now we need to know what overall t values and for what curves we need to get each point to be
+    # the same length along the contour
+    for contour_index in [0, 1]:
+        contour = contours[contour_index]
+        num_curves = len(contour)
+
+        num_points = globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH
+        adjusted_points_in_curve_groups = contour.get_equally_spaced_points_along(num_points,
+                                                                                  return_relative_to_upper_left_curve=True)
+        # we now have the points; order them such that their indices are from top left and around
+        # upper left curve should be 0 and its points 0, 1, 2, etc.
+
+        equidistant_points_dicts.append(adjusted_points_in_curve_groups)
+
+        # # we'll later need the curve containing the upper-left-most point for synchronization
+        # temp_points_dict = custom_math.sort_dictionary({point: np.linalg.norm(point) for point in equally_spaced_points_dict},
+        #                                                by_key_or_value=1)
+        # upper_left_point = next(temp_points_dict.keys())
+        # upper_left_points.append(next(temp_points_dict.keys()))     # gets the first element of this list - the smallest-norm point
+
+
+
+    # for each of the curves in C2 which of those in
+    # C1 contains the largest number of the same point indices as it does
+
+    mapping_dict = {c1: None for c1 in range(n1)}
+    curves_mapped = 0
+    points_correctly_mapped = 0
+
+    c1_dict, c2_dict = equidistant_points_dicts
+    for c2_index in range(n2):
+        c2_points_in_curve = c2_dict[c2_index]
+        scores_against_c1_curves = {c1: 0 for c1 in range(n1)}
+
+        best_C1_index = 0
+
+        for c1_index in range(n1):
+            c1_points_in_curve = [adj_index for adj_index, coords in c1_dict[c1_index]]
+            current_number_of_points_matched = 0
+
+            for c2_point_index, c2_point_coords in c2_points_in_curve:
+                if c2_point_index in c1_points_in_curve:
+                    current_number_of_points_matched += 1
+
+            scores_against_c1_curves[c1_index] = current_number_of_points_matched
+            #
+            # if current_number_of_points_matched > highest_number_of_points_matched:
+            #     best_C1_index = c1_index
+            #     highest_number_of_points_matched = current_number_of_points_matched
+
+        # pick the best available C1 curve
+        scores_against_c1_curves = custom_math.sort_dictionary(scores_against_c1_curves, by_key_or_value=1, reverse=True)
+        for c1_index, c1_score in enumerate(scores_against_c1_curves):
+            if mapping_dict[c1_index] is None:
+                best_C1_index = c1_index
+                curves_mapped += 1
+                points_correctly_mapped += c1_score
+                break
+
+        mapping_dict[best_C1_index] = c2_index
+    print("Mapped all curves: ", curves_mapped == n2)
+
+    return mapping_dict, points_correctly_mapped
+
+
+def find_ofer_min_mapping_old(contour1, contour2):
     # make the contour1 variable hold the larger of the two
     if len(contour1) > globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD:
         print("WARNING: Contour1 had more than", globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD, "curves")
@@ -469,6 +685,7 @@ def find_ofer_min_mapping(contour1, contour2):
         # return [random_indices, random_offset], current_mapping_score
 
     # START OPTIMAL CASE ====================================
+    print("NOT HERE!!!")
     if did_it:
         print("Completed filtering to less curves: New Outer-iters:", outer_iterations)
 

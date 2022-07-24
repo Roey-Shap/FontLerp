@@ -8,6 +8,10 @@ import custom_math
 import custom_colors
 import contour
 import itertools
+import time
+
+import ptext
+
 
 class Glyph(object):
     def __init__(self):
@@ -224,6 +228,25 @@ class Glyph(object):
         # then let them draw their respective outlines
         for contour in self.contours:
             contour.draw(surface, radius, color=None, width=width)
+
+            if True:
+                pnts_dict = contour.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
+                                                                    return_relative_to_upper_left_curve=True)
+
+                for i, pair in enumerate(pnts_dict.items()):
+                    curve_index, pnts = pair
+                    num_pnts = len(pnts)
+                    for adj_index, coords in pnts:
+                        camera_coords = custom_math.world_to_cameraspace(coords)
+                        camera_coords = (camera_coords[0], camera_coords[1])
+                        # print(camera_coords)
+                        if adj_index == 0:
+                            tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
+                            globvar.screen.blit(tsurf, tpos)
+                        # pygame.draw.circle(globvar.screen, (0, 255 * i/num_pnts, 0), custom_math.world_to_cameraspace(p), 3)
+                    # if i == round(time.time()) % len(contour):
+                    #
+                    #     break
 
         if globvar.DEBUG:
             # pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius)

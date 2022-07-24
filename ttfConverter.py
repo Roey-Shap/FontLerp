@@ -94,4 +94,5 @@ def convert_quadratic_flagged_points_to_contour(flagged_points):
             cont.append_curve(quad_curve)
             current_points = [current_coords]                           # reset the list for the next curve
 
+    cont.update_bounds()
     return cont

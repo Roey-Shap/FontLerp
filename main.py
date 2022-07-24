@@ -79,11 +79,12 @@ test_glyphs = []
 
 
 extracted_h1_data = ttfConverter.test_font_load("p", test_fonts[0])
-extracted_h2_data = ttfConverter.test_font_load("p", test_fonts[1])
+extracted_h2_data = ttfConverter.test_font_load("p", test_fonts[2])
 test_h = glyph.Glyph()
 test_i = glyph.Glyph()
 for cnt in extracted_h1_data:
-    test_h.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
+    formatted_contour = ttfConverter.convert_quadratic_flagged_points_to_contour(cnt)
+    test_h.append_contour(formatted_contour)
 # test_h.prune_curves()
 test_h.worldspace_scale_by(0.1)
 test_h.worldspace_offset_by(np.array([w/4, h/2]))
@@ -95,8 +96,10 @@ test_h.sort_contours_by_fill()
 # test_i.em_scale(0.8)
 
 for cnt in extracted_h2_data:
-    test_i.append_contour(ttfConverter.convert_quadratic_flagged_points_to_contour(cnt))
-test_i.worldspace_scale_by(0.12)
+    formatted_contour = ttfConverter.convert_quadratic_flagged_points_to_contour(cnt)
+    test_i.append_contour(formatted_contour)
+
+test_i.worldspace_scale_by(0.15)
 test_i.worldspace_offset_by(np.array([w*3/4, h/2]))
 test_i.update_bounds()
 test_i.sort_contours_by_fill()
