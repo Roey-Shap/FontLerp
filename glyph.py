@@ -148,6 +148,8 @@ class Glyph(object):
             point = curve_obj.worldspace_tween_points[point_index]
 
             prev_point = point
+            between_tween_points = []
+            num_tween_points = curve_obj.worldspace_tween_points.shape[0]
 
             point_index += 1
 
@@ -155,37 +157,50 @@ class Glyph(object):
                 distance_remaining = dis_between_points
                 # continue until you have no distance left or no curves left in the contour
                 while distance_remaining > 0 and curve_index < num_curves:
+                    prev_point = point
                     # walk along the next piece of the curve
                     # if you've reached the end of this curve, move to next curve
-                    if point_index == curve_obj.num_points:
+                    if point_index == num_tween_points:
                         point_index = 0
                         curve_index += 1
                         if curve_index == num_curves:
                             break
                         curve_obj = c.curves[curve_index]
+                        num_tween_points = curve_obj.worldspace_tween_points.shape[0]
 
-                    point = curve_obj.worldspace_tween_points[point_index]
+                    if len(between_tween_points) == 0:
+                        point = curve_obj.worldspace_tween_points[point_index]
+                    else:
+                        point = between_tween_points.pop()
+
                     distance_travelled = np.linalg.norm(point - prev_point)
 
-                    # TODO make it so that we're even more specific and take pieces of distance travelled?
-                    #  it's a straight line, so we could calculate what percentage of it we need to traverse...
-                    #  and that would make it more accurate...
+                    # if you don't need to use all of that distance, only use some of it
+                    if distance_travelled > distance_remaining:
+                        # make the current point the in between point
+                        # we know how long we have to go and what line we're walking along
+                        fraction_travelled = (distance_travelled - distance_remaining) / distance_travelled
+                        actual_end_point = point
+                        point = (point * (1 - fraction_travelled)) + (fraction_travelled * prev_point)
+
+                        distance_travelled = distance_remaining     # for the distance_remaining -= dist_travelled calc
+                        between_tween_points.append(actual_end_point)               # store this as an irregular point
 
                     distance_remaining -= distance_travelled
 
-                    point_index += 1
+                    if len(between_tween_points) == 0:
+                        point_index += 1
 
                 # if you ran out of curves in the contour and have distance left,
                 # the point naturally gets placed at the end, which is a good solution to that edge-case
                 target_point = point
-                # pygame.draw.circle(globvar.screen, (0, 255, 0), custom_math.world_to_cameraspace(target_point), 6)
+                # pygame.draw.circle(globvar.screen, (0, 255 * p/points_allotted, 0), custom_math.world_to_cameraspace(target_point), 3)
                 average_point += custom_math.world_to_cameraspace(target_point)
 
 
         # we now have the sum of all of the surrounding points; convert to average
         average_point /= globvar.POINTS_TO_CHECK_AVERAGE_WITH
 
-        print("average in worldspace is:", average_point)
         return average_point
 
         # upper_left = self.get_upper_left_camera()

@@ -29,6 +29,10 @@ class Toolbar(object):
                                                         "Click to view the mapping between the glyphs, if one exists",
                                                         global_manager.toggle_show_current_glyph_mapping,
                                                         self.standard_button_dimensions)
+        toggle_control_point_display_button = self.add_button("Toggle Control Point Display",
+                                                              "Click to view extra curve information",
+                                                              global_manager.toggle_show_extra_curve_information,
+                                                              self.standard_button_dimensions)
         make_reduction_mapping_button = self.add_button("Suggest Reduction Mapping",
                                                         "Make a mapping between the two active glyphs",
                                                         global_manager.make_mapping_from_active_glyphs,

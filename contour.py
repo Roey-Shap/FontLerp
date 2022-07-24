@@ -335,29 +335,13 @@ def find_ofer_min_mapping(contour1, contour2):
     if outer_iterations > maximal_tolerable_iterations:
         print("Warning: number of possible mappings is too high to find optimal mapping; using greedy method")
 
-        """
-        For such cases, make a list of all (n2 x n1) scores for each (C2.curve, C1.curve pair).
-        Sort the scores such that the highest is at the beginning and iterate through the list, taking the highest score 
-        which adheres to the restriction that the pair whose score it is follows the contour order so far.
-        That is, if you've constrained yourself to picking (C2.curves[5], C1.curves[1]), then you couldn't pick
-        (C2.curves[4], C1.curves[2]) because 4 comes before 5 but 2 comes after 1.
-        Similarly, you couldn't pick (C2.curves[6], C1.curves[0]) because 6 comes after 5 while 0 comes before 1.
-        You could potentially pick (C2.curves[4], C1.curves[0]), though, because cyclic order is maintained 
-        (4<5, 0<1).
-        
-        We continue doing this, adding up the score we got until all curves of C2 have been mapped or until we've
-        arrived back to the beginning (invalid mapping; is this even possible...).
-        That finishes one iteration. We can now find the next potential mapping and its score by starting from
-        the highest score of a mapping involved C2.curves[1]. The next iteration starts with C2.curves[2], and so on.
-        
-        Building the matrix is O(n2*n1), and each iteration potentially scans the entire array.
-        Since we do that n2 times, all iterations together are O(n2*n2*n1) - much better than the polynomial time
-        of the exhaustive search.
-        """
+        # calculate how many curves we can afford to take on
+        sufficient_curves = maximal_curves_for_threshold(n1, n2, maximal_tolerable_iterations)
 
         # calculate scores
         scores = {}
         average_c1_scores = {}
+        best_c1_scores = {c1: -math.inf for c1 in range(n1)}
         for c1_index in range(n1):
             average_score = 0
             c1_curve = contour1.curves[c1_index]
@@ -366,16 +350,23 @@ def find_ofer_min_mapping(contour1, contour2):
                 score = calc_curve_score_MSE(c1_curve, c2_curve)
                 average_score += score
                 scores[(c1_index, c2_index)] = score
+                best_c1_scores[c1_index] = max(best_c1_scores[c1_index], score)
+
             average_score /= n2
             average_c1_scores[c1_index] = average_score
 
-        sorted_c1_scores = custom_math.sort_dictionary(average_c1_scores, 1, reverse=True)
+        sorted_c1_average_scores = custom_math.sort_dictionary(average_c1_scores, 1, reverse=True)
 
-        sufficient_curves = maximal_curves_for_threshold(n1, n2, maximal_tolerable_iterations)
         best_c1_indices = []
-        for i, key in enumerate(sorted_c1_scores):
+        for i, key in enumerate(sorted_c1_average_scores):
             if i < sufficient_curves:
                 best_c1_indices.append(key)
+
+        # best_c1_indices = []
+        # sorted_c1_scores = custom_math.sort_dictionary(best_c1_scores, 1, reverse=True)
+        # for i, key in enumerate(sorted_c1_scores):
+        #     if i < sufficient_curves:
+        #         best_c1_indices.append(key)
 
         index_subsets = itertools.combinations(best_c1_indices, n2)
         did_it = True

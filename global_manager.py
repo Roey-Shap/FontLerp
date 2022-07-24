@@ -106,6 +106,10 @@ def toggle_show_current_glyph_mapping():
     globvar.show_current_glyph_mapping = not globvar.show_current_glyph_mapping
     return
 
+def toggle_show_extra_curve_information():
+    globvar.show_extra_curve_information = not globvar.show_extra_curve_information
+    return
+
 def make_mapping_from_active_glyphs():
     g1, g2 = globvar.active_glyphs
     globvar.current_glyph_mapping, globvar.glyph_score = glyph.find_glyph_null_contour_mapping(g1, g2, debug_info=True)
@@ -115,13 +119,13 @@ def make_mapping_from_active_glyphs():
 
 def go_into_point_manipulation_mode():
     globvar.manager.state = GlobalManager.State.ADJUSTING_POINTS
-    globvar.show_extra_curve_information = True
+    # globvar.show_extra_curve_information = True
     return
 
 def add_custom_mapping():
     # put the manager into mapping creation mode
     globvar.manager.state = GlobalManager.State.MAPPING_CURVES
-    globvar.show_extra_curve_information = False
+    # globvar.show_extra_curve_information = False
 
     # store new custom mapping, set up other global variables surrounding validity of glyph being drawn, etc.
     current_g1, current_g2 = globvar.active_glyphs

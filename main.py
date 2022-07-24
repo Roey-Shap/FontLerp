@@ -206,7 +206,7 @@ not_scrolling = True
 running = True
 while running:
 
-    point_radius = 5
+    point_radius = globvar.POINT_DRAW_RADIUS
 
 # Clock Updates
     clock.tick(globvar.FPS)
