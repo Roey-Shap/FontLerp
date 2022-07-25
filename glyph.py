@@ -14,7 +14,7 @@ import ptext
 
 
 class Glyph(object):
-    def __init__(self):
+    def __init__(self, letter="A"):
         globvar.glyphs.append(self)
 
         self.contours = []
@@ -26,6 +26,7 @@ class Glyph(object):
         self.width = 0
         self.height = 0
 
+        self.character_code = letter
         return
 
     def copy(self):
@@ -44,6 +45,7 @@ class Glyph(object):
         return len(self.contours)
 
     def append_contour(self, contour):
+        contour.character_code = self.character_code
         self.contours.append(contour)
         return
 
@@ -272,7 +274,7 @@ and is of the same fill type (clockwise or CCW).
 That contour will begin as a copy in G2 and become what it is in G1.
 That inherently gives it a mapping.
 """
-def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
+def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_info=False):
     # ensure that glyph1 has no less contours than glyph2
     n1 = len(glyph1)
     n2 = len(glyph2)
@@ -306,7 +308,7 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
     glyph2.worldspace_offset_by(-g2_center)
 
 
-    # TODO implement clockwise/CCW preference in contour mapping
+    # TODO implement clockwise/CCW preference in contour mapping (currently just never picks those I think)
     # pick a mapping of glyph2's contours to glyph1's (any to any)
     g1_subsets = itertools.combinations(range(n1), n2)      # pick any n2-size subset of g1's contours
     g2_permutations = itertools.permutations(range(n2))     # try all permutations of g2's contours
@@ -318,6 +320,9 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
     # try letting each contour in G2 get a unique contour in G1
     for g1_subset in g1_subsets:
         for g2_perm in g2_permutations:
+            if glyph1.character_code == "O":
+                print("trying", g1_subset, g2_perm)
+                print("... on O with glyphs of sizes", n1, n2)
             # with g1_subset and g2_perm we've decided on a potential first part of a glyph mapping
             # find the potential mapping's score by adding all of the contour mapping scores for each pair of contours
             current_mapping_set_score = 0
@@ -326,7 +331,7 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
                 g1_contour = glyph1.contours[g1_c]
                 g2_contour = glyph2.contours[g2_c]
 
-                mapping, score = calc_contour_score_MSE(g1_contour, g2_contour)
+                mapping, score = contour_mapping_function(g1_contour, g2_contour)
                 current_mapping_set_score += score
                 # recall that we give this from g1's perspective, so a mapping pair for this 'c1' is
                 # a corresponding g2 contour 'c2' and the mapping between them
@@ -350,33 +355,39 @@ def find_glyph_null_contour_mapping(glyph1, glyph2, debug_info=False):
         current_best_mapping = None
         current_c2_index = -1
         current_best_score = -math.inf
+        found_one_at_all = False
         for c2_index, contour2 in enumerate(glyph2.contours):
             # reminder: returns the best mapping of curves and score of that mapping
-            mapping, mapping_score = calc_contour_score_MSE(contour1, contour2)
-            if mapping_score > current_best_score:
+            mapping, mapping_score = contour_mapping_function(contour1, contour2)
+            if mapping_score > current_best_score or not found_one_at_all:
                 current_best_mapping = mapping
                 current_best_score = mapping_score
                 current_c2_index = c2_index
+                found_one_at_all = True
         # we've now decided which of G2's contours is best
         # append contour1's mapping with it and add the mapping's score
+        if current_best_mapping is None:
+            print("CURRENT BEST MAPPING IS NONE! LINE 369")
         best_mapping[g1_index] = (current_c2_index, current_best_mapping)
         total_score += current_best_score
 
     glyph1.worldspace_offset_by(g1_center)
     glyph2.worldspace_offset_by(g2_center)
 
+
     return best_mapping, total_score
 
 
-def lerp_glyphs(glyph1, glyph2, mappings, t, debug_info=False):
+def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_info=False):
     n1 = len(glyph1)
     n2 = len(glyph2)
+
     if n2 > n1:
         temp = glyph1
         glyph1 = glyph2
         glyph2 = temp
 
-    lerped_glpyh = Glyph()
+    lerped_glpyh = Glyph(glyph1.character_code)
     n1 = len(glyph1)
     n2 = len(glyph2)
 
@@ -392,7 +403,7 @@ def lerp_glyphs(glyph1, glyph2, mappings, t, debug_info=False):
         # print("current details:", g1_mapping_details)
         g1_contour = glyph1.contours[g1_contour_index]
         g2_contour = glyph2.contours[g2_contour_index]
-        lerped_contour = contour.lerp_contours_OMin(g1_contour, g2_contour, g2_contour_mapping, t)
+        lerped_contour = contour_lerping_function(g1_contour, g2_contour, g2_contour_mapping, t)
 
         # TODO set contour fill type correctly
         #  for now, it'll just be its original type (should still be that way later...? I think? Since

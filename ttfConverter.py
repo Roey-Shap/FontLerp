@@ -99,12 +99,13 @@ def convert_quadratic_flagged_points_to_contour(flagged_points):
     return cont
 
 def glyph_from_font(char, font_file_name):
-    g = glyph.Glyph()
+    g = glyph.Glyph(char)
     extracted_font_data = test_font_load(char, font_file_name)
     for cnt in extracted_font_data:
         formatted_contour = convert_quadratic_flagged_points_to_contour(cnt)
         formatted_contour.update_bounds()
         g.append_contour(formatted_contour)
+        g.update_bounds()
 
     g.sort_contours_by_fill()
     return g

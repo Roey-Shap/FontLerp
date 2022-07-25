@@ -4,6 +4,7 @@ import global_variables as globvar
 
 import operator as op
 from functools import reduce
+import math
 
 """
 Maps a value in [pre_min, pre_max] to another in [post_min, post_max]
@@ -90,3 +91,19 @@ def points_clock_direction(points):
     signed_area += (x1 * y2) - (x2 * y1)
 
     return np.sign(signed_area)
+
+def find_point_closest_to_anchor(anchor_point, points, return_point_index=False):
+    closest_point = points[0]
+    closest_point_index = 0
+    best_dis = math.inf
+    for index, p in enumerate(points):
+        cur_dis = np.linalg.norm(p - anchor_point)
+        if cur_dis < best_dis:
+            closest_point = p
+            best_dis = cur_dis
+            closest_point_index = index
+
+    if return_point_index:
+        return (closest_point_index, closest_point)
+
+    return closest_point

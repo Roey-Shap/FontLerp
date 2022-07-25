@@ -42,6 +42,7 @@ line_width = 3
 base_scale = 1
 
 w, h = globvar.SCREEN_DIMENSIONS
+global_manager.set_mapping_and_lerping_methods("Pillow Projection")
 
 
 # create default glyph bounding box
@@ -53,18 +54,22 @@ glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DE
 #
 
 test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
+print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFERENT FILL TYPES. PLAY"
+      "AROUND WITH SOME TEXT TO SEE WHAT I MEAN. THERE'S PROBABLY A SIMPLE SOLUTION BUT I DON'T"
+      "HAVE THE ENERGY OR TIME RIGHT NOW.")
 
-test_text = "Through the wawa"
+test_text = "I think I'm done with this project for now."
 print(custom_math.unique_string_values(test_text))
-test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, test_fonts[0], test_fonts[1])
+test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, test_fonts[0], test_fonts[2],
+                                                         wrap_x=14000)
 for g in test_lerped_glyphs:
-    g.worldspace_scale_by(0.1)
-    g.worldspace_offset_by(np.array([0, h/2]))
+    g.worldspace_scale_by(0.07)
+    g.worldspace_offset_by(np.array([75, 75]))
 
 
 
 test_glyphs = []
-#
+
 # for i, font in enumerate(test_fonts):
 #     g = glyph.Glyph()
 #     test_glyphs.append(g)
@@ -85,11 +90,11 @@ test_glyphs = []
 #     print("")
 
 
-
-extracted_h1_data = ttfConverter.test_font_load("p", test_fonts[0])
-extracted_h2_data = ttfConverter.test_font_load("p", test_fonts[2])
-test_h = glyph.Glyph()
-test_i = glyph.Glyph()
+character = "R"
+extracted_h1_data = ttfConverter.test_font_load(character, test_fonts[0])
+extracted_h2_data = ttfConverter.test_font_load(character, test_fonts[2])
+test_h = glyph.Glyph(character)
+test_i = glyph.Glyph(character)
 for cnt in extracted_h1_data:
     formatted_contour = ttfConverter.convert_quadratic_flagged_points_to_contour(cnt)
     test_h.append_contour(formatted_contour)
@@ -206,10 +211,10 @@ circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_
 
 mixed_glyph = None
 mappings = None
-# mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
+# mappings, glyph_score = glyph.find_glyph_contour_mapping(test_h, test_i, contour.find_pillow_projection_mapping, debug_info=True)
 
 
-# mixed_glyph = glyph.lerp_glyphs(test_h, test_i, mappings, 0)
+# globvar.lerped_glyph = glyph.lerp_glyphs(test_h, test_i, contour.lerp_contours_pillow_proj, mappings, 0)
 
 not_scrolling = True
 
@@ -297,7 +302,9 @@ while running:
         a = 1
         # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
         # g1, g2 = globvar.active_glyphs
-        # globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_mapping, mix_t)
+        # globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2,
+        #                                          contour.lerp_contours_pillow_proj,
+        #                                          mappings, mix_t)
         # globvar.lerped_glyph.worldspace_offset_by(np.array([w/2, h*0.75]))
         # globvar.lerped_glyph.update_bounds()
 
@@ -306,12 +313,13 @@ while running:
 
 
     # Rendering ===============================================================================================
-    screen.fill(colors.WHITE)
+    if globvar.update_screen:
+        screen.fill(colors.WHITE)
 
     # Left glyph unit boundaries
     border_width = 1
     corner_rad = 3
-    pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
+    # pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
     if globvar.lerped_glyph is not None:
         globvar.lerped_glyph.draw(screen, point_radius)
@@ -326,15 +334,17 @@ while running:
 
 
     if globvar.show_current_glyph_mapping:
-        manager.draw_mapping_reduction(screen)
+        manager.draw_mapping_pillow_projection(screen, mappings)
 
-    # GUI drawing
-    cursor.draw(screen)
-    toolbar.draw(screen)
+
+    if globvar.update_screen:
+        # GUI drawing
+        cursor.draw(screen)
+        toolbar.draw(screen)
 
 
     # Debug drawing
-    if globvar.DEBUG:
+    if globvar.DEBUG and globvar.update_screen:
         pygame.draw.circle(screen, colors.RED, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
         pygame.draw.circle(screen, colors.RED, custom_math.world_to_cameraspace(origin), 5)
 
@@ -344,9 +354,9 @@ while running:
                           "Mouse position: " + str(np.round(mouse_pos, 3)),
                           "Mouse position in world: " + str(np.round(cursor.screen_to_world_space(mouse_pos), 3)),
                           "Width, Height: " + str(globvar.SCREEN_DIMENSIONS),
-                          "Global Manager State: " + str(manager.state),
+                          "Global Manager State: " + str(manager.state)]
                           # "All Mappings: " + str(globvar.glyph_mappings)]
-                          "Glyph Mapping: " + str(globvar.current_glyph_mapping)]
+                          # "Glyph Mapping: " + str(globvar.current_glyph_mapping)]
         for i, message in enumerate(debug_messages):
             text_rect = pygame.Rect(0, 0, w/4, h)
             debug_text_surface = fonts.multiLineSurface(message, fonts.FONT_DEBUG, text_rect, colors.BLACK)
@@ -354,10 +364,10 @@ while running:
             screen.blit(debug_text_surface, (20, (i+1) * 20))
 
 
+    if globvar.update_screen:
+        pygame.display.flip()
 
-    pygame.display.flip()
-
-
+    # globvar.update_screen = False
 
 
 

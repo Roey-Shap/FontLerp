@@ -33,6 +33,8 @@ class Contour(object):
         self.fill = FILL.ADD
         self.starting_curve = 0
 
+        self.character_code = None
+
         globvar.contours.append(self)
         return
 
@@ -202,6 +204,22 @@ class Contour(object):
             # print("rel angle:", cur_curve_rel_angle)
         return
 
+    def get_anchor_world(self):
+        top_left = self.get_upper_left_world()
+        down_right = self.get_lower_right_world()
+        top_right = np.array([down_right[0], top_left[1]])
+        down_left = np.array([top_left[0], down_right[1]])
+        if self.character_code in globvar.up_lefters:
+            return top_left
+        elif self.character_code in globvar.up_righters:
+            return top_right
+        elif self.character_code in globvar.down_righters:
+            return down_right
+        elif self.character_code in globvar.down_lefters:
+            return down_left
+        else:   # commas and stuff for now
+            return down_right
+
     def get_equally_spaced_points_along(self, num_points,
                                         return_relative_to_upper_left_curve=False):
 
@@ -299,7 +317,7 @@ class Contour(object):
         result = resultant_points
 
         # anchor = np.array(self.get_lower_right_world()[0], self.get_upper_left_world()[1])
-        anchor = self.get_lower_right_world()
+        anchor = self.get_anchor_world()
         if return_relative_to_upper_left_curve:
 
             # get the curve with smallest min squared error to upper left point
@@ -422,6 +440,54 @@ def maximal_curves_for_threshold(n1, n2, threshold):
     # should never reach here
     return n2
 
+"""
+For C1 being the contour with at least as many curves as C2:
+1) find equally spaced points along each of the curves
+2) find the rotational offset that makes the points fit each other best (MSE)
+3) return the points for each and the mapping between them; also the MSE score found
+"""
+def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
+    if len(contour2) > len(contour1):
+        temp = contour1
+        contour1 = contour2
+        contour2 = temp
+
+    n1 = len(contour1)
+    n2 = len(contour2)
+
+    num_sample_points = globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH
+    contours = [contour1, contour2]
+    equidis_point_lists = []
+    starting_points = []
+    for contour in contours:
+        equidis_points = contour.get_equally_spaced_points_along(num_sample_points)
+
+        anchor = contour.get_upper_left_world()
+
+        # find the point closest to the anchor
+        closest_point = custom_math.find_point_closest_to_anchor(anchor, equidis_points, return_point_index=True)
+        closest_point_index = closest_point[0]
+        starting_points.append(closest_point)
+
+        # find best rotational offset by assigning each point an index based on that which
+        # is closest to an arbitrary anchor; offset the points in each such that they start from closest point
+        equidis_points = {(index - closest_point_index) % num_sample_points: coords
+                          for index, coords in enumerate(equidis_points)}
+        equidis_points = custom_math.sort_dictionary(equidis_points, by_key_or_value=0)
+        equidis_points = equidis_points.values()
+
+        equidis_point_lists.append(equidis_points)
+
+    mapping = {i: (p1, p2) for i, (p1, p2) in enumerate(zip(equidis_point_lists[0], equidis_point_lists[1]))}
+    score = 0
+    for p1, p2 in mapping.values():
+        score += np.sum((p1 - p2) ** 2)
+
+    score *= -1 / num_sample_points         # lower MSE is better
+
+    if contour1.fill != contour2.fill:
+        print("Fills don't match but were the only options! Beware of strange results!")
+    return mapping, score
 
 """
 Let C1 be the contour with more curves and C2 that with less.
@@ -478,6 +544,10 @@ def find_ofer_min_mapping(contour1: Contour, contour2: Contour):
     points_correctly_mapped = 0
 
     c1_dict, c2_dict = equidistant_points_dicts
+
+    # sort the curves by size to find which should get their pick first
+    # c2_curves_by_size = custom_math.sort_dictionary({index: contour2.curves[index].get_length_world() for index in range(n2)},
+    #                                                 by_key_or_value=1, reverse=False)
     for c2_index in range(n2):
         c2_points_in_curve = c2_dict[c2_index]
         scores_against_c1_curves = {c1: 0 for c1 in range(n1)}
@@ -715,6 +785,37 @@ use the mapping given to determine which curves between the relevant indices
 given in the mapping should be mapped to "zero curves" in c2.
 """
 
+def lerp_contours_pillow_proj(contour1, contour2, point_mapping, t):
+    if len(contour2) > len(contour1):
+        temp = contour1
+        contour1 = contour2
+        contour2 = temp
+        t = 1 - t
+
+    n1 = len(contour1)
+    n2 = len(contour2)
+
+    lerped_contour = Contour()
+
+    num_pairs = len(list(point_mapping.keys()))
+    lerped_points = []
+    for pair in point_mapping.values():
+        p1, p2 = pair
+        lerped_points.append(custom_math.interpolate_np(p1, p2, t))
+
+    # just make a new contour from quadratic beziers connecting each point linearly
+    prev_point = lerped_points[0]
+    point = prev_point
+    for i in range(num_pairs + 1):
+        cyclic_index = i % num_pairs
+        prev_point = point
+        point = lerped_points[cyclic_index]
+        line_points = np.array([point, custom_math.interpolate_np(point, prev_point, 0.5), prev_point])
+        new_curve = curve.Bezier(line_points)
+        lerped_contour.append_curve(new_curve)
+
+
+    return lerped_contour
 
 def lerp_contours_OMin(contour1, contour2, mapping: dict, t, debug_info=False):
     # we know we need n1 curves in total

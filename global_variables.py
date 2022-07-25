@@ -2,7 +2,7 @@ import pygame
 import custom_colors
 import numpy as np
 import cursor
-import global_manager
+import glyph
 
 # Functions
 def em_to_worldspace(np_array):
@@ -35,13 +35,21 @@ POINT_DRAW_RADIUS = 3
 POINTS_TO_CHECK_AVERAGE_WITH = 50                   # for the whole glyph we're getting the average for!
 POINTS_TO_GET_CONTOUR_MAPPING_WITH = 100            # for EACH contour
 
+
+up_lefters = "cegiklmnoswx"
+up_righters = "fr"
+down_righters = "bhjpqyz"
+down_lefters = "adtuv"
+
+
 # Shape constants
 CIRCLE_CONST = 0.552284749831
 
 
 
 # Meta control variables
-DEBUG = True
+DEBUG = False
+update_screen = True
 
 hovered_point = None
 selected_point = None
@@ -56,14 +64,16 @@ KEY_SPACE_HELD = False
 KEY_SPACE_PRESSED = False
 
 show_current_glyph_mapping = False
-show_extra_curve_information = True
+show_extra_curve_information = False
 
-BEZIER_ACCURACY = global_manager.update_bezier_accuracy()
-t_values = global_manager.calculate_t_array()
+BEZIER_ACCURACY = 4
+t_values = None
 
 active_glyphs = [None, None]
 current_glyph_mapping = None
 current_glyph_mapping_is_valid = False
+current_glyph_mapping_method = None
+current_glyph_lerping_method = None
 lerped_glyph = None
 
 
@@ -84,3 +94,7 @@ glyphs = []
 glyph_mappings = {}            # a dictionary of key:value pairs (g1, g2): [custom_map, reduction_map, insertion_map]
 
 
+
+
+
+cur_character_lerped = "X"
