@@ -200,6 +200,16 @@ class Bezier(Curve):
 
 
     """
+    Check against all of the current worldspace tween points; if it's close enough to one of them, it's on
+    """
+    def contains_point(self, test_point):
+        for point in self.worldspace_tween_points:
+            if np.all(np.isclose(point, test_point)):
+                return True
+
+        return False
+
+    """
     Sets this Bezier's points and caches linear combinations of them for interpolated points.
     Returns a (2x4) matrix
     ===
@@ -267,6 +277,41 @@ class Bezier(Curve):
             pygame.draw.circle(surface, color, p, radius)
 
         return
+
+    """ 
+    from https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm
+    Split the 
+    """
+    def de_casteljau(self, t):
+        if self.num_points == 3:
+            return self.de_casteljau_quad(t)
+        elif self.num_points == 4:
+            return self.de_casteljau_cubic(t)
+
+
+    def de_casteljau_quad(self, t):
+        A, B, C = self.worldspace_points
+        E = custom_math.interpolate_np(A, B, t)
+        F = custom_math.interpolate_np(B, C, t)
+
+        G = custom_math.interpolate_np(E, F, t)
+        quad1 = Bezier(np.array([A, E, G]))
+        quad2 = Bezier(np.array([G, F, C]))
+
+        return quad1, quad2
+
+    # TODO Implement Cubic splitting - maybe even also quad -> cubic split? We'll see if it's still useful...
+    def de_casteljau_cubic(self, t):
+        raise ValueError("UNIMPLEMENTED")
+        return
+
+
+        # beta = [c for c in self.worldspace_points]  # values in this list are overridden
+        # degree = len(beta)
+        # for j in range(1, degree):
+        #     for k in range(degree - j):
+        #         beta[k] = beta[k] * (1 - t) + beta[k + 1] * t
+        # return beta[0]
 
 
 

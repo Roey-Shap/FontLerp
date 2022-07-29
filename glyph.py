@@ -88,6 +88,7 @@ class Glyph(object):
         max_down = -math.inf
         for contour in self.contours:
             contour.update_bounds()
+
             up_left = contour.get_upper_left_world()
             down_right = contour.get_lower_right_world()
             min_left = min(min_left, up_left[0])
@@ -119,15 +120,16 @@ class Glyph(object):
         return pygame.Rect(self.get_upper_left_camera(),
                            self.width * globvar.CAMERA_ZOOM, self.height * globvar.CAMERA_ZOOM)
 
-    def get_center_world(self):
-        upper_left = self.get_upper_left_world()
-        world_dimensions = np.array([self.width, self.height])
-        return upper_left + (world_dimensions/2)
+    def get_center_camera(self):
+        return custom_math.world_to_cameraspace(self.get_center_world())
+        # upper_left = self.get_upper_left_world()
+        # world_dimensions = np.array([self.width, self.height])
+        # return upper_left + (world_dimensions/2)
 
     """
     The center is defined to be the average of the predetermined number of points which are plotted along the curves
     """
-    def get_center_camera(self):
+    def get_center_world(self):
 
         average_point = np.array([0, 0], dtype=globvar.POINT_NP_DTYPE)
 
@@ -200,8 +202,7 @@ class Glyph(object):
                 # if you ran out of curves in the contour and have distance left,
                 # the point naturally gets placed at the end, which is a good solution to that edge-case
                 target_point = point
-                # pygame.draw.circle(globvar.screen, (0, 255 * p/points_allotted, 0), custom_math.world_to_cameraspace(target_point), 3)
-                average_point += custom_math.world_to_cameraspace(target_point)
+                average_point += target_point
 
 
         # we now have the sum of all of the surrounding points; convert to average
@@ -232,27 +233,40 @@ class Glyph(object):
             contour.draw(surface, radius, color=None, width=width)
 
             if True:
-                pnts_dict = contour.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
-                                                                    return_relative_to_upper_left_curve=True)
-                if False:
-                    for i, pair in enumerate(pnts_dict.items()):
-                        curve_index, pnts = pair
-                        num_pnts = len(pnts)
-                        for adj_index, coords in pnts:
-                            camera_coords = custom_math.world_to_cameraspace(coords)
-                            camera_coords = (camera_coords[0], camera_coords[1])
-                            # print(camera_coords)
+                pnts = contour.get_points_along_from_fractions([0, 0.1, 0.5, 0.8, 0.95])
+                num_pnts = len(pnts)
+                for i, coords in enumerate(pnts):
+                    camera_coords = custom_math.world_to_cameraspace(coords)
+                    camera_coords = (camera_coords[0], camera_coords[1])
 
-                            tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
-                            globvar.screen.blit(tsurf, tpos)
-                            # pygame.draw.circle(globvar.screen, (0, 255 * i/num_pnts, 0), custom_math.world_to_cameraspace(p), 3)
-                    # if i == round(time.time()) % len(contour):
-                    #
-                    #     break
+                    # tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
+                    # globvar.screen.blit(tsurf, tpos)
+                    col = round(255 * i / num_pnts)
+                    pygame.draw.circle(surface, (0, col, col), camera_coords, 4)
 
-        if globvar.show_extra_curve_information:
-            # pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius)
-            # pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius)
+        # if True:
+            #     pnts_dict = contour.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
+            #                                                         return_relative_to_upper_left_curve=True)
+            #     num_pnts = sum(len(pnts) for pnts in pnts_dict.values())
+            #     for i, pair in enumerate(pnts_dict.items()):
+            #         curve_index, pnts = pair
+            #         for adj_index, coords in pnts:
+            #             camera_coords = custom_math.world_to_cameraspace(coords)
+            #             camera_coords = (camera_coords[0], camera_coords[1])
+            #             # print(camera_coords)
+            #
+            #             # tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
+            #             # globvar.screen.blit(tsurf, tpos)
+            #             col = round(255 * adj_index / num_pnts)
+            #             pygame.draw.circle(surface, (0, col, 0), camera_coords, 3)
+            #
+            #     # if i == round(time.time()) % len(contour):
+            #     #
+            #     #     break
+
+        if globvar.show_extra_curve_information or True:
+            pygame.draw.circle(surface, custom_colors.GREEN, self.get_upper_left_camera(), radius)
+            # pygame.draw.circle(surface, custom_colors.GREEN, self.get_lower_right_camera(), radius)
             pygame.draw.circle(surface, custom_colors.RED, self.get_center_camera(), radius)
         return
 
@@ -292,7 +306,7 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
     g2_closure = glyph2.check_all_contours_closed()
 
     if not (g1_closure and g2_closure):
-        raise AttributeError("Both glpyhs must be closed to find an OferMin Mapping, "
+        raise AttributeError("Both glpyhs must be closed to find a Mapping, "
                              "but: \n  ->G1's closure was " + str(g1_closure) + ", and G2's closure was " + str(
             g2_closure))
 
@@ -307,6 +321,8 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
     glyph1.worldspace_offset_by(-g1_center)
     glyph2.worldspace_offset_by(-g2_center)
 
+    glyph1.update_bounds()
+    glyph2.update_bounds()
 
     # TODO implement clockwise/CCW preference in contour mapping (currently just never picks those I think)
     # pick a mapping of glyph2's contours to glyph1's (any to any)
@@ -320,9 +336,6 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
     # try letting each contour in G2 get a unique contour in G1
     for g1_subset in g1_subsets:
         for g2_perm in g2_permutations:
-            if glyph1.character_code == "O":
-                print("trying", g1_subset, g2_perm)
-                print("... on O with glyphs of sizes", n1, n2)
             # with g1_subset and g2_perm we've decided on a potential first part of a glyph mapping
             # find the potential mapping's score by adding all of the contour mapping scores for each pair of contours
             current_mapping_set_score = 0
@@ -374,6 +387,8 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
     glyph1.worldspace_offset_by(g1_center)
     glyph2.worldspace_offset_by(g2_center)
 
+    glyph1.update_bounds()
+    glyph2.update_bounds()
 
     return best_mapping, total_score
 
@@ -391,11 +406,17 @@ def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_inf
     n1 = len(glyph1)
     n2 = len(glyph2)
 
+    glyph1.update_bounds()
+    glyph2.update_bounds()
+
     g1_center = glyph1.get_center_world()
     g2_center = glyph2.get_center_world()
 
     glyph1.worldspace_offset_by(-g1_center)
     glyph2.worldspace_offset_by(-g2_center)
+
+    glyph1.update_bounds()
+    glyph2.update_bounds()
 
     # mappings is a dictionary of form (contour in g1, (contour in g2, mapping from c1 -> c2))
     for g1_contour_index in mappings:
@@ -415,6 +436,10 @@ def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_inf
     glyph1.worldspace_offset_by(g1_center)
     glyph2.worldspace_offset_by(g2_center)
 
+    glyph1.update_bounds()
+    glyph2.update_bounds()
 
+    lerped_glpyh.update_bounds()
+    print("lerped glyph:", glyph1.character_code, "has", len(lerped_glpyh), "contours")
     return lerped_glpyh
 

@@ -349,6 +349,98 @@ class Contour(object):
 
         return result
 
+
+    def get_points_along_from_fractions(self, fractions_along_of_points,
+                                        return_with_curves=False):
+
+
+        fractions_along_of_points.sort()    # so we can traverse them in order
+        fractions_along_of_points.append(1) # so the last difference between fractions gets a chance to be processed
+        num_points = len(fractions_along_of_points)
+
+        resultant_points = []
+        curves_and_points = {index: [] for index in range(len(self))}
+
+        contour_length_worldspace = self.get_length_worldspace()
+
+        num_curves = len(self)
+        self_upper_left = self.get_upper_left_world()
+
+        # now find these points by walking along the contour and add their values to the average
+        curve_index = 0
+        curve_obj = self.curves[curve_index]
+        point_index = 0
+        point = curve_obj.worldspace_tween_points[point_index]
+
+        prev_point = point
+        between_tween_points = []
+        num_tween_points = curve_obj.worldspace_tween_points.shape[0]
+
+        point_index += 1
+
+        # we want to traverse the contour in order, so the fractions_along_of_points
+        # list is sorted; this allows us to consider the distance_remaining to
+        # be the difference in the previous total distance and the current
+        distance_remaining = contour_length_worldspace * fractions_along_of_points[0]
+        distance_to_run = distance_remaining
+        prev_distance_to_run = 0
+        for p, fraction_along in enumerate(fractions_along_of_points):
+            distance_remaining = distance_to_run - prev_distance_to_run
+
+            # update for next loop
+            prev_distance_to_run = distance_to_run
+            distance_to_run = contour_length_worldspace * fraction_along
+
+            # continue until you have no distance left or no curves left in the contour
+            while distance_remaining > 0 and curve_index < num_curves:
+                prev_point = point
+                # walk along the next piece of the curve
+                # if you've reached the end of this curve, move to next curve
+                if point_index == num_tween_points:
+                    point_index = 0
+                    curve_index += 1
+                    if curve_index == num_curves:
+                        break
+                    curve_obj = self.curves[curve_index]
+                    num_tween_points = curve_obj.worldspace_tween_points.shape[0]
+
+                if len(between_tween_points) == 0:
+                    point = curve_obj.worldspace_tween_points[point_index]
+                else:
+                    point = between_tween_points.pop()
+
+                distance_travelled = np.linalg.norm(point - prev_point)
+
+                # if you don't need to use all of that distance, only use some of it
+                if distance_travelled > distance_remaining:
+                    # make the current point the in between point
+                    # we know how long we have to go and what line we're walking along
+                    fraction_travelled = (distance_travelled - distance_remaining) / distance_travelled
+                    actual_end_point = point
+                    point = (point * (1 - fraction_travelled)) + (fraction_travelled * prev_point)
+
+                    distance_travelled = distance_remaining  # for the distance_remaining -= dist_travelled calc
+                    between_tween_points.append(actual_end_point)  # store this as an irregular point
+
+
+                distance_remaining -= distance_travelled
+
+                if len(between_tween_points) == 0:
+                    point_index += 1
+
+
+            # get the distance from
+            resultant_points.append(point)
+            if return_with_curves:
+                curves_and_points[(curve_index % num_curves)].append((p, point))
+
+        result = resultant_points
+
+        if return_with_curves:
+            result = curves_and_points
+
+        return result
+
     # Drawing
     def draw(self, surface, radius, color=None, width=1):
         # draw curves in colors corresponding to their order in this contour
@@ -440,6 +532,10 @@ def maximal_curves_for_threshold(n1, n2, threshold):
     # should never reach here
     return n2
 
+
+
+# Finding mappings =============================================
+
 """
 For C1 being the contour with at least as many curves as C2:
 1) find equally spaced points along each of the curves
@@ -462,7 +558,7 @@ def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
     for contour in contours:
         equidis_points = contour.get_equally_spaced_points_along(num_sample_points)
 
-        anchor = contour.get_upper_left_world()
+        anchor = contour.get_upper_left_world()         # TODO maybe change this to whichever anchor which minimizes MSE to each contour's center?
 
         # find the point closest to the anchor
         closest_point = custom_math.find_point_closest_to_anchor(anchor, equidis_points, return_point_index=True)
@@ -487,20 +583,14 @@ def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
 
     if contour1.fill != contour2.fill:
         print("Fills don't match but were the only options! Beware of strange results!")
+
     return mapping, score
 
+
 """
-Let C1 be the contour with more curves and C2 that with less.
-Determines the mapping by the OferMin method and returns
-the mapping of lines in C2 to those in C1 which are determined to be most relevant
-in the form [indices of c1 to take, offset of c2 to use]
+Returns a mapping in the form of {{(contour1, contour2), rest_of_mapping_between_their_curves}}, score
 """
-
-def find_ofer_min_mapping(contour1: Contour, contour2: Contour):
-    if contour1.fill != contour2.fill:
-        return None, -math.inf
-
-
+def find_relative_projection_mapping(contour1: Contour, contour2: Contour):
     if len(contour2) > len(contour1):
         temp = contour1
         contour1 = contour2
@@ -508,276 +598,221 @@ def find_ofer_min_mapping(contour1: Contour, contour2: Contour):
 
     n1 = len(contour1)
     n2 = len(contour2)
+
+    # split each curve into many points along each; these will work as fine-grain units
+    num_sample_points = globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH
     contours = [contour1, contour2]
+    equidis_point_lists = []
+    starting_points = []
+    control_point_percentages_dicts = []
+    control_point_percentages_lists = []
+    for contour in contours:
+        equidis_points = contour.get_equally_spaced_points_along(num_sample_points)
 
-    # find the mapping by matching points from n2 into n1
-    # given a curve in n2, pick the curve in c1 who the majority of its points fall into
+        anchor = contour.get_upper_left_world()         # TODO maybe change this to whichever anchor which minimizes MSE to both contours' centers?
 
-    equidistant_points_dicts = []
-    # now we need to know what overall t values and for what curves we need to get each point to be
-    # the same length along the contour
-    for contour_index in [0, 1]:
-        contour = contours[contour_index]
-        num_curves = len(contour)
+        # find the point closest to the anchor
+        start_point = custom_math.find_point_closest_to_anchor(anchor, equidis_points, return_point_index=True)
+        start_point_index = start_point[0]
+        starting_points.append(start_point)
 
-        num_points = globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH
-        adjusted_points_in_curve_groups = contour.get_equally_spaced_points_along(num_points,
-                                                                                  return_relative_to_upper_left_curve=True)
-        # we now have the points; order them such that their indices are from top left and around
-        # upper left curve should be 0 and its points 0, 1, 2, etc.
+        # find best rotational offset by assigning each point an index based on that which
+        # is closest to an arbitrary anchor; offset the points in each such that they start from closest point
+        equidis_points = {(index - start_point_index) % num_sample_points: coords
+                          for index, coords in enumerate(equidis_points)}
+        equidis_points = custom_math.sort_dictionary(equidis_points, by_key_or_value=0)
 
-        equidistant_points_dicts.append(adjusted_points_in_curve_groups)
+        # equidis_points is now the points sorted so that the 0th entry is that point closest to anchor
+        # and the rest follow cyclically around the contour
+        equidis_points = list(equidis_points.values())
 
-        # # we'll later need the curve containing the upper-left-most point for synchronization
-        # temp_points_dict = custom_math.sort_dictionary({point: np.linalg.norm(point) for point in equally_spaced_points_dict},
-        #                                                by_key_or_value=1)
-        # upper_left_point = next(temp_points_dict.keys())
-        # upper_left_points.append(next(temp_points_dict.keys()))     # gets the first element of this list - the smallest-norm point
+        equidis_point_lists.append(equidis_points)
+
+        # we now need to find the approximate locations of this contour's control points compared to these unit points
+        control_point_percentages = {curve: [] for curve in contour.curves}
+        control_point_percentages_all = []
+        for curve in contour.curves:
+            for control_point in [curve.worldspace_points[0], curve.worldspace_points[-1]]:
+                # for now we'd like to only consider control points on the curve - those which partition it
+                # if #curve.contains_point(control_point): # TODO used to check if curves where on curve but now just using endpoints
+                # on_curve_control_points.append(control_point)
+                point_index, approximate_coords = custom_math.find_point_closest_to_anchor(control_point,
+                                                                                           equidis_points,
+                                                                                           return_point_index=True)
+                # convert to a fraction along from the start point determined before
+                fraction_around = point_index / num_sample_points
+                control_point_percentages[curve].append(fraction_around)
+                control_point_percentages_all.append(fraction_around)
 
 
+        # on_curve_control_point_lists.append(on_curve_control_points)
+        control_point_percentages_dicts.append(control_point_percentages)
+        control_point_percentages_lists.append(control_point_percentages_all)
 
-    # for each of the curves in C2 which of those in
-    # C1 contains the largest number of the same point indices as it does
 
-    mapping_dict = {c1: None for c1 in range(n1)}
-    curves_mapped = 0
-    points_correctly_mapped = 0
+    # ==== END PREPROCESSING SECTION =====
+    #
+    #
+    #     # c2_coords_on_c1 = contour1.get_points_along_from_fractions(c2_fractions_around)
+    #     # c1_coords_on_c2 = contour2.get_points_along_from_fractions(c1_fractions_around)
+    #
+    #
+    # # generate two new contours with the same number of control points:
+    # # C1_, with C2's points marked on it and split accordingly,
+    # # and C2_ with C1's points marked on it and split accordingly
+    #     # c1_on_curve_points, c2_on_curve_points = on_curve_control_point_lists
+    #
+    # # for c1, for example, the dicts's points should look like:
+    # # {(c1 curve object): [c2_points that fall between its endpoints]}
+    # # where each point is of the form (fraction units, coords)
+    # # and both the keys and their lists should be in order of fraction along
+    #     # marked_c1_coords = c2_coords_on_c1 + c1_on_curve_points     # c1, marked with its own points and c2's
+    #     # marked_c2_points = c1_coords_on_c2 + c2_on_curve_points     # c2, marked with its own points and c1's
+    #
+    #     # num_marked = len(marked_c1_coords)
+    #     # num_marked2 = len(marked_c2_points)
+    #     # print("do they have the same number of coords? they should!", num_marked == num_marked2)
+    # #
+    # # cur_c1_point = marked_c1_coords[0]
+    # # for c1_i in range(num_marked + 1):
+    # #     cur_is_c1, cur_coords = marked_c1_coords[c1_i % num_marked]
+    # #     next_is_c1, next_coords = marked_c1_coords[(c1_i + 1) % num_marked]
+    # #
+    # # start building marked_c1_coords in the required form; begins from any point since both will have all points
+    #
+    # # ===== BEGIN CONTOUR SPLITTING =====
+    # # for each contour we find where its on-curve control points fall, fraction-wise, along the other one
+    # c1_control_points_fractions, c2_control_points_fractions = control_point_percentages_dicts
+    # c1_control_point_fractions_all, c2_control_point_fractions_all = control_point_percentages_lists
+    #
+    # # # these are lists of points sorted by adjusted index (starting from point closest to anchor)
+    # # points_along_c1, points_along_c2 = equidis_point_lists
 
-    c1_dict, c2_dict = equidistant_points_dicts
+    split_contours = []
+    mapping = {}        # for each pair of percentages bounding a curve store that curve
 
-    # sort the curves by size to find which should get their pick first
-    # c2_curves_by_size = custom_math.sort_dictionary({index: contour2.curves[index].get_length_world() for index in range(n2)},
-    #                                                 by_key_or_value=1, reverse=False)
-    for c2_index in range(n2):
-        c2_points_in_curve = c2_dict[c2_index]
-        scores_against_c1_curves = {c1: 0 for c1 in range(n1)}
+    def add_to_mapping(endpoint1_percent, endpoint2_percent, subcurve):
+        endpoint1_percent = round(endpoint1_percent, 7)
+        endpoint2_percent = round(endpoint2_percent, 7)
 
-        best_C1_index = 0
+        # allowing the values to be over 1 is great for sorting
+        # when it comes to grouping them together, though, different contours
+        # may choose to add 1 for different fraction-values;
+        # thus we normalize it all back to the same unit space when adding in the mapping
+        if endpoint1_percent > 1:
+            endpoint1_percent -= 1
+        if endpoint2_percent > 1:
+            endpoint2_percent -= 1
 
-        for c1_index in range(n1):
-            c1_points_in_curve = [adj_index for adj_index, coords in c1_dict[c1_index]]
-            current_number_of_points_matched = 0
+        if (endpoint1_percent, endpoint2_percent) not in mapping.keys():
+            # print("!", endpoint1_percent, endpoint2_percent)
+            mapping[(endpoint1_percent, endpoint2_percent)] = []
+            # print(mapping[(endpoint1_percent, endpoint2_percent)])
 
-            for c2_point_index, c2_point_coords in c2_points_in_curve:
-                if c2_point_index in c1_points_in_curve:
-                    current_number_of_points_matched += 1
 
-            scores_against_c1_curves[c1_index] = current_number_of_points_matched
+        # print((endpoint1_percent, endpoint2_percent) not in mapping.keys())
+        mapping[(endpoint1_percent, endpoint2_percent)].append(subcurve)
+        return
+
+    for contour_index, contour_being_split in enumerate([contour1, contour2]):
+        # "my" refers to the contour currently being split
+        # "their" or "other" refers to the contour whose point-fraction-values are being references
+        # e.g. if contour_being_split = contour1 then my_control_points_fractions = c1_control_points_fractions
+        my_control_points_fractions = control_point_percentages_dicts[contour_index]
+        their_control_point_fractions_all = control_point_percentages_lists[1 - contour_index]
+        split_contour = Contour()
+        split_contours.append(split_contour)
+
+        for curve in contour_being_split.curves:
+            # interval_start_point = c1_curve.worldspace_points[0]
+            # interval_end_point = c1_curve.worldspace_points[-1]
             #
-            # if current_number_of_points_matched > highest_number_of_points_matched:
-            #     best_C1_index = c1_index
-            #     highest_number_of_points_matched = current_number_of_points_matched
+            # interval_start_point_index, start_approximate_coords = custom_math.find_point_closest_to_anchor(
+            #                                                                             interval_start_point,
+            #                                                                             points_along_c1,
+            #                                                                             return_point_index=True)
+            # interval_start_fraction = interval_start_point_index / num_sample_points
+            #
+            # interval_end_point_index, end_approximate_coords = custom_math.find_point_closest_to_anchor(
+            #                                                                             interval_end_point,
+            #                                                                             points_along_c1,
+            #                                                                             return_point_index=True)
+            # interval_end_fraction = interval_end_point_index / num_sample_points
+            interval_start_fraction, interval_end_fraction = my_control_points_fractions[curve]
 
-        # pick the best available C1 curve
-        scores_against_c1_curves = custom_math.sort_dictionary(scores_against_c1_curves, by_key_or_value=1, reverse=True)
-        for c1_index, c1_score in enumerate(scores_against_c1_curves):
-            if mapping_dict[c1_index] is None:
-                best_C1_index = c1_index
-                curves_mapped += 1
-                points_correctly_mapped += c1_score
-                break
+            # start the splitting process by just taking the entire current curve
+            remaining_interval_bezier = curve
+            # does this curve interval start before 0%/100% and end after it (bridges the loop around?)
+            curve_loops_around = interval_start_fraction > interval_end_fraction
+            if curve_loops_around:
+                print("")
+                print("loops around with start and end", interval_start_fraction, interval_end_fraction)
+                interval_end_fraction += 1
 
-        mapping_dict[best_C1_index] = c2_index
-    print("Mapped all curves: ", curves_mapped == n2)
+            # get all of the points on c2 that are between these control points
+            contained_fractions_from_other = []
+            for fraction_value in their_control_point_fractions_all:
+                in_interval_regular = interval_start_fraction < fraction_value < interval_end_fraction
+                in_interval_other_side = False#curve_loops_around and fraction_value < interval_end_fraction
+                if in_interval_regular or in_interval_other_side:
+                    if fraction_value < interval_start_fraction and curve_loops_around:    # if this is a point after the contour's start point we found earlier
+                        contained_fractions_from_other.append(fraction_value + 1)
+                    else:
+                        contained_fractions_from_other.append(fraction_value)
 
-    return mapping_dict, points_correctly_mapped
+            # sort the contained fractions so that the points are used to split the bezier in order
+            contained_fractions_from_other.sort()
+
+            # begin actually making the new curves from the current contour's current endpoints and the newly found
+            # midway points
+            for fraction_value in contained_fractions_from_other:
+                # continue splitting until you have no more c2 points between this curve's endpoints
+                interval_fraction_range = interval_end_fraction - interval_start_fraction
+                if interval_fraction_range > 0 and fraction_value - interval_start_fraction > 0:
+                    percent_of_remaining_bezier = (fraction_value - interval_start_fraction) / interval_fraction_range
+
+                    bezier1, bezier2 = remaining_interval_bezier.de_casteljau(percent_of_remaining_bezier)
+                    split_contour.append_curve(bezier1)
+
+                    add_to_mapping(interval_start_fraction, fraction_value, bezier1)
+
+                    remaining_interval_bezier = bezier2
+
+                    # move the interval's new 'start' to where this one just made the split
+                    interval_start_fraction = fraction_value
+
+            # END CURVE SPLITTING LOOP FOR ONE CURVE - AFTER APPENDING THIS LAST SUBCURVE PROCEED TO SPLIT NEXT CURVE
+
+            # append the last curve created - it isn't included in the loop above
+            split_contour.append_curve(remaining_interval_bezier)
+            # interval_start_fraction is now the last fraction_value of the loop
+            add_to_mapping(interval_start_fraction, interval_end_fraction, remaining_interval_bezier)
+
+        split_contour.update_bounds()
 
 
-def find_ofer_min_mapping_old(contour1, contour2):
-    # make the contour1 variable hold the larger of the two
-    if len(contour1) > globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD:
-        print("WARNING: Contour1 had more than", globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD, "curves")
-    if len(contour2) > globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD:
-        print("WARNING: Contour2 had more than", globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD, "curves")
+    score = 0
+    num_curve_pairs = len(mapping)
+    for endpoint_percentage_pair in mapping.keys():
+        urg = len(mapping[endpoint_percentage_pair])
+        if urg < 2:
+            print("LOOK AT LINE 781!!! GOT MAPPING OF LENGTH:", urg)
+            for key in mapping:
+                print(key, mapping[key])
+        # TODO REMOVE THIS OVERRIDE REMOVE IT REMOVE IT
+        if urg > 1:
+            bezier1, bezier2 = mapping[endpoint_percentage_pair]
+            score += calc_curve_score_MSE(bezier1, bezier2)
 
-    if len(contour2) > len(contour1):
-        temp = contour1
-        contour1 = contour2
-        contour2 = temp
+    score *= -1 / num_curve_pairs         # lower MSE is better
 
-    n1 = len(contour1)
-    n2 = len(contour2)
+    if contour1.fill != contour2.fill:
+        print("Fills don't match but were the only options! Beware of strange results!")
+
+    return mapping, score
 
 
-    # contour1.update_curve_center_relative_angles()
-    # contour2.update_curve_center_relative_angles()
-
-    best_score = -math.inf
-    best_mapping = None
-
-    # To find the best match amongst the curves:
-    # 1) pick any n2 of the n1 curves to test a mapping to
-    # 2) pick some circular permutation (an offset, basically) of those n2 curves
-
-    # itertools.combinations gives you any subset of r elements from the input iterable
-    # crucially, it maintains the order of those elements
-    index_subsets = itertools.combinations(range(n1), n2)  # returns all sets of indices in [0, n-1] of size n2
-    range_n2 = list(range(n2))
-    outer_iterations = custom_math.ncr(n1, n2)
-    print("Number of index subsets is:", outer_iterations)
-    did_it = False
-    maximal_tolerable_iterations = 25000
-
-    if outer_iterations > maximal_tolerable_iterations:
-        print("Warning: number of possible mappings is too high to find optimal mapping; using greedy method")
-
-        # calculate how many curves we can afford to take on
-        sufficient_curves = maximal_curves_for_threshold(n1, n2, maximal_tolerable_iterations)
-
-        # calculate scores
-        scores = {}
-        average_c1_scores = {}
-        best_c1_scores = {c1: -math.inf for c1 in range(n1)}
-        for c1_index in range(n1):
-            average_score = 0
-            c1_curve = contour1.curves[c1_index]
-            for c2_index in range_n2:
-                c2_curve = contour2.curves[c2_index]
-                score = calc_curve_score_MSE(c1_curve, c2_curve)
-                average_score += score
-                scores[(c1_index, c2_index)] = score
-                best_c1_scores[c1_index] = max(best_c1_scores[c1_index], score)
-
-            average_score /= n2
-            average_c1_scores[c1_index] = average_score
-
-        sorted_c1_average_scores = custom_math.sort_dictionary(average_c1_scores, 1, reverse=True)
-
-        best_c1_indices = []
-        for i, key in enumerate(sorted_c1_average_scores):
-            if i < sufficient_curves:
-                best_c1_indices.append(key)
-
-        # best_c1_indices = []
-        # sorted_c1_scores = custom_math.sort_dictionary(best_c1_scores, 1, reverse=True)
-        # for i, key in enumerate(sorted_c1_scores):
-        #     if i < sufficient_curves:
-        #         best_c1_indices.append(key)
-
-        index_subsets = itertools.combinations(best_c1_indices, n2)
-        did_it = True
-        outer_iterations = custom_math.ncr(sufficient_curves, n2)
-        #
-        # scores = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1], reverse=True)}
-        # print(scores)
-        # # different method interrupting here: find the highest-scoring mapping for each of C2's curves
-        # # taken_c1_curves = []
-        # # cur_score = 0
-        # # for c2_index in range_n2:
-        # #     for i, curve_pair in enumerate(scores.keys()):
-        # #         if curve_pair[1] == c2_index and curve_pair[0] not in taken_c1_curves:
-        # #             taken_c1_curves.append(curve_pair[0])
-        # #             cur_score += scores[curve_pair]
-        # # return [taken_c1_curves, range_n2.copy()], cur_score
-        #
-        # best_score = -math.inf
-        # best_mapping = []
-        # # begin by picking a C2 curve to give "priority to" (be the starting point)
-        # for c2_index in range_n2:
-        #     # try to build a list of the best-scored pairs that follow cyclic order of the curves in their contours
-        #     # find the best-scored pair using c2_index
-        #     tolerance = 1000                              # describes how many places down you're willing to go
-        #     tolerance_step = 2                           # to find a starting point for a given starting c2_index
-        #     for t in range(0, tolerance, tolerance_step):
-        #         tolerance_countdown = 0
-        #
-        #         current_total_score = 0
-        #         current_mapping_indices = []
-        #         current_mapping_offset = c2_index
-        #
-        #         current_pair_index = 0
-        #         first_c1_chosen = -1
-        #         first_c2_chosen = c2_index
-        #         last_c1_chosen = -1
-        #         last_c2_chosen = c2_index
-        #         yet_wrapped = False
-        #
-        #         for i, curve_pair in enumerate(scores.keys()):
-        #             if curve_pair[1] == c2_index:
-        #                 tolerance_countdown += 1
-        #                 if tolerance_countdown >= t:
-        #                     first_c1_chosen = curve_pair[0]
-        #                     first_c2_chosen = curve_pair[1]
-        #                     last_c1_chosen = curve_pair[0]
-        #                     last_c2_chosen = curve_pair[1]
-        #                     current_pair_index = i
-        #                     current_total_score += scores[curve_pair]
-        #                     current_mapping_indices.append(last_c1_chosen)
-        #                     break
-        #
-        #         # go over the remaining curves and find the best one that complies with the order
-        #         curve_pairs_list = list(scores.keys())
-        #         curves_mapped = 1                                                           # just the initial c2_curve was found
-        #         iterations = 0
-        #         while curves_mapped < n2 and iterations < len(curve_pairs_list):
-        #             iterations += 1
-        #             current_pair_index = (current_pair_index + 1) % len(curve_pairs_list)   # we start at current_pair_index so immediately increment
-        #             curve_pair = curve_pairs_list[current_pair_index]
-        #             cur_c1_curve, cur_c2_curve = curve_pair
-        #
-        #             curve_is_earlier_in_contour = cur_c1_curve < first_c1_chosen and not yet_wrapped
-        #             curve_is_later_in_contour = cur_c1_curve > last_c1_chosen
-        #             wrapped_and_is_later = yet_wrapped and curve_is_later_in_contour and cur_c1_curve < first_c1_chosen
-        #             no_wrap_and_is_later = (not yet_wrapped) and curve_is_later_in_contour
-        #             valid_c1_index = curve_is_earlier_in_contour or wrapped_and_is_later or no_wrap_and_is_later
-        #             valid_c2_index = cur_c2_curve == ((last_c2_chosen + 1) % n2)
-        #
-        #             if valid_c1_index and valid_c2_index:
-        #                 if cur_c1_curve < first_c1_chosen:
-        #                     yet_wrapped = True
-        #
-        #                 last_c1_chosen = cur_c1_curve
-        #                 last_c2_chosen = cur_c2_curve
-        #                 curves_mapped += 1
-        #                 current_total_score += scores[curve_pair]
-        #                 current_mapping_indices.append(last_c1_chosen)
-        #
-        #         print(c2_index, current_mapping_indices, "with", curves_mapped, "curves mapped")
-        #         # we've found this potential mapping; is its total score high enough?
-        #         if current_total_score > best_score and curves_mapped == n2:
-        #             best_score = current_total_score
-        #             current_mapping_indices.sort()
-        #             best_mapping = [current_mapping_indices, current_mapping_offset]
-        #
-        # # print("Unoptimal OMin mapping found!")
-        # return best_mapping, best_score
-
-    # END UNOPTIMAL CASE ====================================
-        # random_indices = random.sample(list(range(n1)), n2)
-        # random_offset = range_n2[random.randint(0, n2-1)]
-        # current_mapping_score = 0
-        #
-        #
-        # for c1_index, c2_index in zip(random_indices, range_n2):
-        #     c1_curve = contour1.curves[c1_index]
-        #     c2_curve = contour2.curves[(c2_index + random_offset) % n2]
-        #     current_mapping_score += calc_curve_score_MSE(c1_curve, c2_curve)
-        # return [random_indices, random_offset], current_mapping_score
-
-    # START OPTIMAL CASE ====================================
-    print("NOT HERE!!!")
-    if did_it:
-        print("Completed filtering to less curves: New Outer-iters:", outer_iterations)
-
-    for indices in index_subsets:
-        # iterate through all offsets
-        for offset in range_n2:
-            # use the offset by iterating through all placements
-            # build a score for this mapping (based on both the indices and offset currently being tested)
-            current_mapping_score = 0
-            current_mapping_dict = {c1: None for c1 in range(n1)}
-            for c1_index, c2_index in zip(indices, range_n2):
-                c1_curve = contour1.curves[c1_index]
-                c2_curve = contour2.curves[(c2_index + offset) % n2]
-                current_mapping_score += calc_curve_score_MSE(c1_curve, c2_curve)
-                current_mapping_dict[c1_index] = (c2_index + offset) % n2
-
-            if current_mapping_score > best_score:
-                best_score = current_mapping_score
-                best_mapping = current_mapping_dict
-
-    return best_mapping, best_score
-
+# Interpolation functions =============================================
 
 """
 Interpolates between two contours using the OferMin method:
@@ -814,66 +849,34 @@ def lerp_contours_pillow_proj(contour1, contour2, point_mapping, t):
         new_curve = curve.Bezier(line_points)
         lerped_contour.append_curve(new_curve)
 
-
+    lerped_contour.update_bounds()
     return lerped_contour
 
-def lerp_contours_OMin(contour1, contour2, mapping: dict, t, debug_info=False):
-    # we know we need n1 curves in total
-    # we also know which indices of c1 were chosen
-    # therefore for any index not after the expected one (i.e. there is a gap between one index and the next)
-    # we fill with a "zero curve"
 
-    # mapping is a dictionary where each entry is of the form (c1, c2) and if that c1 curve has no mapping, (c1, None)
-
-    # make the same switch as the mapping did; from here, everything should be the same
+def lerp_contours_relative_proj(contour1, contour2, curve_mapping, t):
     if len(contour2) > len(contour1):
         temp = contour1
         contour1 = contour2
         contour2 = temp
-        t = 1-t
+        t = 1 - t
 
     n1 = len(contour1)
     n2 = len(contour2)
 
     lerped_contour = Contour()
 
-    # first find where we start building from
-    first_c1_index = None
-    first_c2_index = None
-    for pair in mapping.items():
-        first_c1_index, first_c2_index = pair
-        if first_c2_index is not None:
-            break
+    # in this method we simply need to lerp between the curves at each endpoint-pair-key
+    for curve_pair in curve_mapping.values():
+        # TODO REMOVE REMOVE REMOVE THIS MANUAL OVERRIDE!!
+        if len(curve_pair) > 1:
+            bezier1, bezier2 = curve_pair
 
-    last_endpoint = contour2.curves[first_c2_index].worldspace_points[0]
-    for pair_index in range(n1):
-        # get the pair in the current cyclic index
-        c1_index = (pair_index + first_c1_index) % n1
-        c2_index = mapping[c1_index]
+            lerp_curve = curve.Bezier(custom_math.interpolate_np(bezier1.worldspace_points,
+                                                                 bezier2.worldspace_points,
+                                                                 t))
+            lerped_contour.append_curve(lerp_curve)
 
-        if debug_info:
-            print("adding curve #", c1_index, ", a mapping between C2's", c2_index, "and C1's",
-                  c1_index)
-        if c2_index is None:            # make a null curve
-            # interpolate between the current c1_curve and the "zero curve" which
-            # consists of four points bunched together at c2's last point
-            contour1_curve_true_points = contour1.curves[c1_index].worldspace_points
-            degree_polynomial = contour1_curve_true_points.shape[0]
-            lerped_zero_curve_points = custom_math.interpolate_np(
-                contour1_curve_true_points,
-                np.array([last_endpoint] * degree_polynomial),
-                t)
-            lerped_contour.append_curve(curve.Bezier(lerped_zero_curve_points))
-        else:                           # make a curve interpolated between the c1_index and c2_index curves
-            # now add the curve you've been trying to give me (we're all caught up to the expected index)
-            # by interpolating between the current c2 curve and the corresponding c1 curve
-            lerped_points = custom_math.interpolate_np(contour1.curves[c1_index].worldspace_points,
-                                                       contour2.curves[c2_index].worldspace_points,
-                                                       t)
-            last_endpoint = contour2.curves[c2_index].worldspace_points[-1]
-            lerped_contour.append_curve(curve.Bezier(lerped_points))
-
-
+    lerped_contour.update_bounds()
     return lerped_contour
 
 

@@ -33,8 +33,8 @@ DEBUG_MESSAGE_POSITION = SCREEN_DIMENSIONS * np.array([0.5, 0.2])
 SCROLL_DELTA = 0.025
 POINT_DRAW_RADIUS = 3
 POINTS_TO_CHECK_AVERAGE_WITH = 50                   # for the whole glyph we're getting the average for!
-POINTS_TO_GET_CONTOUR_MAPPING_WITH = 100            # for EACH contour
-
+POINTS_TO_GET_CONTOUR_MAPPING_WITH = 150            # for EACH contour
+EM_TO_FONT_SCALE = 0.07
 
 up_lefters = "cegiklmnoswx"
 up_righters = "fr"
@@ -76,6 +76,7 @@ current_glyph_mapping_method = None
 current_glyph_lerping_method = None
 lerped_glyph = None
 
+debug_width_points = []         # for when drawing a piece of text and finding character separators
 
 # Runtime control variables
 pygame.init()

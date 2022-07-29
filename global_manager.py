@@ -134,9 +134,14 @@ def set_mapping_and_lerping_methods(string):
     if string == "Pillow Projection":
         globvar.current_glyph_mapping_method = contour.find_pillow_projection_mapping
         globvar.current_glyph_lerping_method = contour.lerp_contours_pillow_proj
+    elif string == "Relative Projection":
+        globvar.current_glyph_mapping_method = contour.find_relative_projection_mapping
+        globvar.current_glyph_lerping_method = contour.lerp_contours_relative_proj
     else:       # default case is Pillow Projection
-        globvar.current_glyph_mapping_method = contour.find_pillow_projection_mapping
-        globvar.current_glyph_lerping_method = contour.lerp_contours_pillow_proj
+        raise ValueError("No default mapping and lerping method!")
+        # print("Warning! Using a DEFAULT ")
+        # globvar.current_glyph_mapping_method = contour.find_pillow_projection_mapping
+        # globvar.current_glyph_lerping_method = contour.lerp_contours_pillow_proj
 
     return
 
@@ -237,8 +242,11 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
     widest_glyph_height = 0
     for char in characters_in_text:
         print("Finding mapping for:", char)
+        print("Doing Font:", font1)
         g1 = ttfConverter.glyph_from_font(char, font1)
+        print("Doing Font:", font2)
         g2 = ttfConverter.glyph_from_font(char, font2)
+        print("")
 
         widest_glyph_width = max(widest_glyph_width, g1.width, g2.width)
         widest_glyph_height = max(widest_glyph_height, g1.height, g2.height)
@@ -251,11 +259,16 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
     current_draw_y = 0
     starting_line = True
     lerped_glyphs = []
+
     # now we have all of the mappings we need - let's generate the text one character at a time
+    globvar.debug_width_points = []
     for i, char in enumerate(text):
+        globvar.debug_width_points.append([current_draw_x*globvar.EM_TO_FONT_SCALE,
+                                           current_draw_y*globvar.EM_TO_FONT_SCALE])
         t = i / string_length
-        if char == ' ' and not starting_line:
-            current_draw_x += widest_glyph_width
+        if char == ' ':
+            if not starting_line:
+                current_draw_x += widest_glyph_width
         else:
             starting_line = False
 
@@ -265,8 +278,12 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
 
             # generate the correct tween-glyph and move the draw_x accordingly
             lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_lerping_method, char_mapping, t)
-            lerped_glyph.worldspace_offset_by(np.array([current_draw_x, current_draw_y]))
+            # make its left side aligned with (0, 0) and then push as needed
+            offset = np.array([current_draw_x, current_draw_y])
+            # lerped_glyph.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+            lerped_glyph.worldspace_offset_by(offset)
             lerped_glyph.update_bounds()
+
             lerped_glyphs.append(lerped_glyph)
             current_draw_x += lerped_glyph.width + between_character_buffer
 
@@ -274,6 +291,7 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
             current_draw_x = 0
             current_draw_y += widest_glyph_height
             starting_line = True
+
 
     return lerped_glyphs
 

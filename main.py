@@ -42,7 +42,7 @@ line_width = 3
 base_scale = 1
 
 w, h = globvar.SCREEN_DIMENSIONS
-global_manager.set_mapping_and_lerping_methods("Pillow Projection")
+global_manager.set_mapping_and_lerping_methods("Relative Projection")
 
 
 # create default glyph bounding box
@@ -58,15 +58,29 @@ print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFER
       "AROUND WITH SOME TEXT TO SEE WHAT I MEAN. THERE'S PROBABLY A SIMPLE SOLUTION BUT I DON'T"
       "HAVE THE ENERGY OR TIME RIGHT NOW.")
 
-test_text = "I think I'm done with this project for now."
-print(custom_math.unique_string_values(test_text))
-test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, test_fonts[0], test_fonts[2],
+test_text = "Larger test text!"
+font1 = "Alef-Regular.ttf"
+font2 = "AndikaNewBasic-B.ttf"
+font_cursive = "Calligraffiti.ttf"
+#
+# print(custom_math.unique_string_values(test_text))
+test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
                                                          wrap_x=14000)
-for g in test_lerped_glyphs:
-    g.worldspace_scale_by(0.07)
-    g.worldspace_offset_by(np.array([75, 75]))
+# for g in test_lerped_glyphs:
+#     # scale down to be at decent screensize
+#     g.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+#     g.update_bounds()
+#
+#     # make all of their bounding boxes' upper left corners flush with (0, 0)
+#     up_left_origin_diff = g.get_center_world() - g.get_upper_left_world()
+#     g.worldspace_offset_by(up_left_origin_diff)
+#     g.update_bounds()
 
-
+test_o = ttfConverter.glyph_from_font("O", font2)
+test_o.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+test_o.update_bounds()
+up_left_origin_diff = test_o.get_upper_left_world()
+test_o.worldspace_offset_by(-up_left_origin_diff)
 
 test_glyphs = []
 
@@ -90,9 +104,9 @@ test_glyphs = []
 #     print("")
 
 
-character = "R"
-extracted_h1_data = ttfConverter.test_font_load(character, test_fonts[0])
-extracted_h2_data = ttfConverter.test_font_load(character, test_fonts[2])
+character = "p"
+extracted_h1_data = ttfConverter.test_font_load(character, font1)
+extracted_h2_data = ttfConverter.test_font_load(character, font_cursive)
 test_h = glyph.Glyph(character)
 test_i = glyph.Glyph(character)
 for cnt in extracted_h1_data:
@@ -211,10 +225,10 @@ circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_
 
 mixed_glyph = None
 mappings = None
-# mappings, glyph_score = glyph.find_glyph_contour_mapping(test_h, test_i, contour.find_pillow_projection_mapping, debug_info=True)
+mappings, glyph_score = glyph.find_glyph_contour_mapping(test_h, test_i, contour.find_pillow_projection_mapping, debug_info=True)
 
 
-# globvar.lerped_glyph = glyph.lerp_glyphs(test_h, test_i, contour.lerp_contours_pillow_proj, mappings, 0)
+globvar.lerped_glyph = glyph.lerp_glyphs(test_h, test_i, contour.lerp_contours_pillow_proj, mappings, 0)
 
 not_scrolling = True
 
@@ -300,13 +314,13 @@ while running:
     # Remix the glyph
     if globvar.current_glyph_mapping_is_valid:
         a = 1
-        # mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-        # g1, g2 = globvar.active_glyphs
-        # globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2,
-        #                                          contour.lerp_contours_pillow_proj,
-        #                                          mappings, mix_t)
+        mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
+        g1, g2 = globvar.active_glyphs
+        globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2,
+                                                 contour.lerp_contours_pillow_proj,
+                                                 mappings, mix_t)
         # globvar.lerped_glyph.worldspace_offset_by(np.array([w/2, h*0.75]))
-        # globvar.lerped_glyph.update_bounds()
+        globvar.lerped_glyph.update_bounds()
 
 
 
@@ -322,9 +336,8 @@ while running:
     # pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
     if globvar.lerped_glyph is not None:
+        print("!")
         globvar.lerped_glyph.draw(screen, point_radius)
-    # for g in test_glyphs:
-    #     g.draw(screen, point_radius, [0, 0])
 
 
     # test_h.draw(screen, point_radius)
@@ -332,6 +345,8 @@ while running:
 
     global_manager.draw_lerped_text(screen, test_lerped_glyphs)
 
+    for debug_point in globvar.debug_width_points:
+        pygame.draw.circle(screen, colors.BLUE, custom_math.world_to_cameraspace(np.array(debug_point)), 5)
 
     if globvar.show_current_glyph_mapping:
         manager.draw_mapping_pillow_projection(screen, mappings)
@@ -342,11 +357,12 @@ while running:
         cursor.draw(screen)
         toolbar.draw(screen)
 
+    # test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
 
     # Debug drawing
-    if globvar.DEBUG and globvar.update_screen:
-        pygame.draw.circle(screen, colors.RED, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
-        pygame.draw.circle(screen, colors.RED, custom_math.world_to_cameraspace(origin), 5)
+    if globvar.update_screen: # TODO globvar.DEBUG and
+        pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
+        pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(origin), 5)
 
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
