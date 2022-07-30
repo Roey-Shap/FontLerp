@@ -65,6 +65,7 @@ KEY_SPACE_PRESSED = False
 
 show_current_glyph_mapping = False
 show_extra_curve_information = False
+show_mixed_glyph = False
 
 BEZIER_ACCURACY = 4
 t_values = None
@@ -80,9 +81,9 @@ debug_width_points = []         # for when drawing a piece of text and finding c
 
 # Runtime control variables
 pygame.init()
-screen = pygame.display.set_mode(SCREEN_DIMENSIONS)
-clock = pygame.time.Clock()
-cursor = cursor.Cursor()
+screen = None
+clock = None
+cursor = None
 toolbar = None
 manager = None
 

@@ -24,25 +24,27 @@ import curve
 import contour
 import glyph
 
-pygame.init()
+print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFERENT FILL TYPES. PLAY"
+      "AROUND WITH SOME TEXT TO SEE WHAT I MEAN. THERE'S PROBABLY A SIMPLE SOLUTION BUT I DON'T"
+      "HAVE THE ENERGY OR TIME RIGHT NOW.")
+print("")
+print("IN ADDITION, THE RELATIVE PROJECTION METHOD STILL NEEDS SOME WORK - CODED IN ONE GO AND SOMETIMES"
+      "DOESN'T HAVE TWO CURVES IN ONE MAPPING SLOT... :(")
+
+manager = global_manager.GlobalManager()
+
 screen = globvar.screen
-pygame.display.set_caption("Font Interpolater")
 clock = globvar.clock
 cursor = globvar.cursor
 
-manager = global_manager.GlobalManager()
-globvar.manager = manager
-
 origin = globvar.origin
 curves = globvar.curves
-toolbar = toolbar.Toolbar()
-globvar.toolbar = toolbar
+toolbar = globvar.toolbar
 
 line_width = 3
-base_scale = 1
 
 w, h = globvar.SCREEN_DIMENSIONS
-global_manager.set_mapping_and_lerping_methods("Relative Projection")
+global_manager.set_mapping_and_lerping_methods("Pillow Projection")
 
 
 # create default glyph bounding box
@@ -54,54 +56,26 @@ glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DE
 #
 
 test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
-print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFERENT FILL TYPES. PLAY"
-      "AROUND WITH SOME TEXT TO SEE WHAT I MEAN. THERE'S PROBABLY A SIMPLE SOLUTION BUT I DON'T"
-      "HAVE THE ENERGY OR TIME RIGHT NOW.")
 
-test_text = "Larger test text!"
+test_text = "More substantial text. This is a short poem written to test the wrapping capabilities."
 font1 = "Alef-Regular.ttf"
 font2 = "AndikaNewBasic-B.ttf"
 font_cursive = "Calligraffiti.ttf"
 #
-# print(custom_math.unique_string_values(test_text))
-test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
-                                                         wrap_x=14000)
-# for g in test_lerped_glyphs:
-#     # scale down to be at decent screensize
-#     g.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
-#     g.update_bounds()
-#
-#     # make all of their bounding boxes' upper left corners flush with (0, 0)
-#     up_left_origin_diff = g.get_center_world() - g.get_upper_left_world()
-#     g.worldspace_offset_by(up_left_origin_diff)
-#     g.update_bounds()
 
-test_o = ttfConverter.glyph_from_font("O", font2)
+test_lerped_glyphs = None
+# test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
+#                                                          wrap_x=w)
+
+test_o = ttfConverter.glyph_from_font("q", font2)
 test_o.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
 test_o.update_bounds()
 up_left_origin_diff = test_o.get_upper_left_world()
 test_o.worldspace_offset_by(-up_left_origin_diff)
+test_o.update_bounds()
 
 test_glyphs = []
 
-# for i, font in enumerate(test_fonts):
-#     g = glyph.Glyph()
-#     test_glyphs.append(g)
-#     contours = ttfConverter.test_font_load("A", font)
-#     num_curves = 0
-#     for c in contours:
-#         contour_object = ttfConverter.convert_quadratic_flagged_points_to_contour(c)
-#         g.append_contour(contour_object)
-#         num_curves += len(contour_object)
-#         print(c)
-#     g.set_offset(w * ((i+1)/5), h/2)
-#     g.update_bounding_points()
-#
-#     print("Made glyph with upper left:", g.upper_left, "and lower right", g.lower_right)
-#     r = g.lower_right - g.upper_left
-#     print("... and thus width:", r[0], "and height:", r[1])
-#     print("Glyph has", num_curves, "curves")
-#     print("")
 
 
 character = "p"
@@ -119,8 +93,6 @@ test_h.update_bounds()
 test_h.sort_contours_by_fill()
 # test_h.worldspace_offset_by(-test_h.get_center_world())
 
-# test_i = test_h.copy()
-# test_i.em_scale(0.8)
 
 for cnt in extracted_h2_data:
     formatted_contour = ttfConverter.convert_quadratic_flagged_points_to_contour(cnt)
@@ -131,104 +103,23 @@ test_i.worldspace_offset_by(np.array([w*3/4, h/2]))
 test_i.update_bounds()
 test_i.sort_contours_by_fill()
 
-# test_g1 = test_h.copy()
-# test_g2 = test_i.copy()
-# test_g1.worldspace_offset_by(-test_h.get_center_world())
-# test_g2.worldspace_offset_by(-test_i.get_center_world())
-# test_i.worldspace_offset_by(-test_i.get_center_world())
 
 global_manager.set_active_glyphs(test_h, test_i)
 
-
-
-circle_const = globvar.CIRCLE_CONST
-c1 = np.array([[0, 0],
-               [0.1, 0.1],
-               [0.2, 0.2],
-               [0.25, 0.25]])
-c2 = np.array([[0.25, 0.25],
-               [0.35, 0.4],
-               [0.4, 0.45],
-               [0.5, 1]])
-c3 = np.array([[0.5, 1],
-               [0.125, 1],
-               [-0.125, 1],
-               [-0.5, 1]])
-c4 = np.array([[-0.5, 1],
-               [-0.625, 0.333],
-               [-0.8, 0.667],
-               [-1, 0]])
-c5 = np.array([[-1, 0],
-               [-0.77, -0.166],
-               [-0.66, -0.333],
-               [-0.5, -0.5]])
-c6 = np.array([[-0.5, -0.5],
-               [-0.166, -0.166],
-               [-0.333, -0.333],
-               [0, 0]])
-
-circle_a1 = np.array([[0, 0],
-                      [circle_const, 0],
-                      [1, 1 - circle_const],
-                      [1, 1]])
-circle_a2 = np.array([[1, 1],
-                      [1, 1 + circle_const],
-                      [circle_const, 2],
-                      [0, 2]])
-circle_a3 = np.array([[0, 2],
-                      [-circle_const, 2],
-                      [-1, 1+circle_const],
-                      [-1, 1]])
-circle_a4 = np.array([[-1, 1],
-                      [-1, 1-circle_const],
-                      [-circle_const, 0],
-                      [0, 0]])
-#
-# cont = contour.Contour()
-# cont.append_curves_from_np([c1, c2, c3, c4, c5, c6])
-# cont.set_offset(4, 1.5)
-# cont.set_scale(base_scale)
-
-circle = contour.Contour()
-circle.append_curves_from_np([circle_a1, circle_a2, circle_a3, circle_a4])
-# circle.set_offset(4, 3.5)
-
-circle_size = 100
-circle_g = glyph.Glyph()
-circle_g.append_contour(circle)
-circle_g.worldspace_scale_by(circle_size)
-circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
-circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
-
-# circle_mini = circle.copy()
-# circle_mini.fill=contour.FILL.SUBTRACT
-# circle_mini.em_scale(0.7)
-# circle_mini.em_offset(0.05, 0.25)
-#
-#
-# circle_mini2 = circle_mini.copy()
-# circle_mini2.fill = contour.FILL.ADD
-# circle_mini2.em_scale(0.3)
-# circle_mini2.em_offset(0, -1)
-# circle_mini2.set_offset(4, 1.6)
-
-#
-# glyph_O = glyph.Glyph()
-# glyph_O.append_contours_multi([circle, circle_mini])
-# glyph_O.update_bounding_points()
-#
-#
-# glyph_test = glyph.Glyph()
-# glyph_test.append_contours_multi([circle_mini2, cont])
-# glyph_test.update_bounding_points()
+# CIRCLE
+# circle = contour.get_unit_circle_contour()
+# circle_size = 100
+# circle_g = glyph.Glyph()
+# circle_g.append_contour(circle)
+# circle_g.worldspace_scale_by(circle_size)
+# circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
+# circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
 
 
 mixed_glyph = None
 mappings = None
-mappings, glyph_score = glyph.find_glyph_contour_mapping(test_h, test_i, contour.find_pillow_projection_mapping, debug_info=True)
+global_manager.make_mapping_from_active_glyphs()
 
-
-globvar.lerped_glyph = glyph.lerp_glyphs(test_h, test_i, contour.lerp_contours_pillow_proj, mappings, 0)
 
 not_scrolling = True
 
@@ -312,18 +203,9 @@ while running:
 
 
     # Remix the glyph
-    if globvar.current_glyph_mapping_is_valid:
-        a = 1
+    if globvar.current_glyph_mapping_is_valid and globvar.show_mixed_glyph:
         mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
-        g1, g2 = globvar.active_glyphs
-        globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2,
-                                                 contour.lerp_contours_pillow_proj,
-                                                 mappings, mix_t)
-        # globvar.lerped_glyph.worldspace_offset_by(np.array([w/2, h*0.75]))
-        globvar.lerped_glyph.update_bounds()
-
-
-
+        global_manager.lerp_active_glyphs(mix_t)
 
 
     # Rendering ===============================================================================================
@@ -333,17 +215,17 @@ while running:
     # Left glyph unit boundaries
     border_width = 1
     corner_rad = 3
-    # pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
+    pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
-    if globvar.lerped_glyph is not None:
-        print("!")
+    if globvar.lerped_glyph is not None and globvar.show_mixed_glyph:
         globvar.lerped_glyph.draw(screen, point_radius)
 
 
     # test_h.draw(screen, point_radius)
     # test_i.draw(screen, point_radius)
 
-    global_manager.draw_lerped_text(screen, test_lerped_glyphs)
+    if test_lerped_glyphs is not None:
+        global_manager.draw_lerped_text(screen, test_lerped_glyphs)
 
     for debug_point in globvar.debug_width_points:
         pygame.draw.circle(screen, colors.BLUE, custom_math.world_to_cameraspace(np.array(debug_point)), 5)
@@ -357,12 +239,12 @@ while running:
         cursor.draw(screen)
         toolbar.draw(screen)
 
-    # test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
+    test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
 
     # Debug drawing
     if globvar.update_screen: # TODO globvar.DEBUG and
-        pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
-        pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(origin), 5)
+        # pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
+        # pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(origin), 5)
 
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),

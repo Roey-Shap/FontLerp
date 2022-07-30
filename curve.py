@@ -36,9 +36,12 @@ class Curve(object):
 
         self.worldspace_points = worldspace_points.copy()
         self.cameraspace_points = worldspace_points.copy()
+        self.unoffset_cameraspace_points = worldspace_points.copy()
 
         self.abstract_points = []
         self.average_point = None
+
+        self.parent_glyph_upper_left = globvar.empty_offset.copy()
 
         self.current_contour_relative_angle = None
 
@@ -171,6 +174,8 @@ class Bezier(Curve):
         self.bernstein_points = None
         self.tween_points = None
         self.worldspace_tween_points = None
+        self.unoffset_tween_points = None
+
 
         self.worldspace_points = worldspace_points
         self.update_points()
@@ -219,6 +224,7 @@ class Bezier(Curve):
     """
     def update_points(self):
         self.cameraspace_points = (self.worldspace_points - globvar.CAMERA_OFFSET) * globvar.CAMERA_ZOOM
+        self.unoffset_camaraspace_points = self.cameraspace_points - self.parent_glyph_upper_left
         for i, abstract_point in enumerate(self.abstract_points):
             abstract_point.update_coords(self.cameraspace_points[i])
 
@@ -226,8 +232,10 @@ class Bezier(Curve):
         # (2xn) = (2xn)*(nxn)
         self.bernstein_points = np.matmul(self.cameraspace_points.T, self.adjustment_matrix)
         self.calc_tween_points()
+        self.unoffset_tween_points = self.tween_points - self.parent_glyph_upper_left
         self.worldspace_tween_points = custom_math.camera_to_worldspace(self.tween_points)
-        self.average_point = np.average(self.cameraspace_points, axis=0)
+
+        # self.average_point = np.average(self.cameraspace_points, axis=0)
         return
 
     """
@@ -240,14 +248,14 @@ class Bezier(Curve):
         return
 
 # Drawing
-    def draw(self, surface, point_radius, input_colors=None, width=1):
+    def draw(self, surface, point_radius, input_colors=None, width=1, flush_with_origin=True):
         colors = [custom_colors.LT_GRAY, custom_colors.BLACK, custom_colors.BLUE]
         if input_colors is not None:
             colors = input_colors
-        self.draw_tween_lines(surface, colors[1], width=width)
+        self.draw_tween_lines(surface, colors[1], width=width, flush_with_origin=flush_with_origin)
 
         if globvar.show_extra_curve_information:
-            self.draw_control_lines(surface, colors[0], width=width)
+            self.draw_control_lines(surface, colors[0], width=width, flush_with_origin=flush_with_origin)
             self.draw_control_points(surface, colors[2], radius=point_radius)
 
         return
@@ -255,17 +263,19 @@ class Bezier(Curve):
     """
     Draws the lines connected the precomputed "render points
     """
-    def draw_tween_lines(self, surface, color, width=1):
-        pygame.draw.aalines(surface, color, closed=False, points=self.tween_points)
+    def draw_tween_lines(self, surface, color, width=1, flush_with_origin=False):
+        conditional_points = self.unoffset_tween_points if flush_with_origin else self.tween_points
+        pygame.draw.aalines(surface, color, closed=False, points=conditional_points)
         return
 
     """
     Draw the lines from the control points to show how they influence the Bezier's curvature
     """
-    def draw_control_lines(self, surface, color, width=1):
+    def draw_control_lines(self, surface, color, width=1, flush_with_origin=False):
         width = round(width/3)
-        pygame.draw.line(surface, color, self.cameraspace_points[0], self.cameraspace_points[1], width=width)
-        pygame.draw.line(surface, color, self.cameraspace_points[-2], self.cameraspace_points[-1], width=width)
+        conditional_points = self.unoffset_camaraspace_points if flush_with_origin else self.cameraspace_points
+        pygame.draw.line(surface, color, conditional_points[0], conditional_points[1], width=width)
+        pygame.draw.line(surface, color, conditional_points[-2], conditional_points[-1], width=width)
         return
 
     """

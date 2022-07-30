@@ -7,6 +7,8 @@ import custom_colors
 import ptext
 import glyph
 import ttfConverter
+import toolbar
+import cursor
 
 class GlobalManager(object):
     class State(int):
@@ -25,6 +27,18 @@ class GlobalManager(object):
 
         update_bezier_accuracy()
         calculate_t_array()
+
+
+        # instantiate meta objects
+        globvar.manager = self
+
+        globvar.screen = pygame.display.set_mode(globvar.SCREEN_DIMENSIONS)
+        globvar.clock = pygame.time.Clock()
+        globvar.cursor = cursor.Cursor()
+
+        globvar.toolbar = toolbar.Toolbar()
+        pygame.init()
+        pygame.display.set_caption("Font Interpolater")
 
         return
 
@@ -167,11 +181,24 @@ def toggle_show_extra_curve_information():
     globvar.show_extra_curve_information = not globvar.show_extra_curve_information
     return
 
+def toggle_lerped_glyph_display():
+    globvar.show_mixed_glyph = not globvar.show_mixed_glyph
+    return
+
 def make_mapping_from_active_glyphs():
     g1, g2 = globvar.active_glyphs
-    globvar.current_glyph_mapping, globvar.glyph_score = globvar.current_glyph_mapping_method(g1, g2, debug_info=True)
+    globvar.current_glyph_mapping, globvar.glyph_score = glyph.find_glyph_contour_mapping(g1, g2, globvar.current_glyph_mapping_method)
     # insert_reduction_glyph_mapping(g1, g2, globvar.current_glyph_mapping)
     globvar.current_glyph_mapping_is_valid = True
+    return
+
+def lerp_active_glyphs(t):
+    g1, g2 = globvar.active_glyphs
+    globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2,
+                                             contour.lerp_contours_pillow_proj,
+                                             globvar.current_glyph_mapping, t)
+    globvar.lerped_glyph.worldspace_offset_by(-globvar.lerped_glyph.get_upper_left_world())
+    globvar.lerped_glyph.update_bounds()
     return
 
 def go_into_point_manipulation_mode():
@@ -239,7 +266,7 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
     character_mappings = {}
 
     widest_glyph_width = 0
-    widest_glyph_height = 0
+    tallest_glyph_height = 0
     for char in characters_in_text:
         print("Finding mapping for:", char)
         print("Doing Font:", font1)
@@ -249,12 +276,12 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
         print("")
 
         widest_glyph_width = max(widest_glyph_width, g1.width, g2.width)
-        widest_glyph_height = max(widest_glyph_height, g1.height, g2.height)
+        tallest_glyph_height = max(tallest_glyph_height, g1.height, g2.height)
 
         char_mapping, score = glyph.find_glyph_contour_mapping(g1, g2, globvar.current_glyph_mapping_method)
         character_mappings[char] = (g1, g2, char_mapping)
 
-    between_character_buffer = 10
+    between_character_buffer = 1
     current_draw_x = 0
     current_draw_y = 0
     starting_line = True
@@ -263,12 +290,12 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
     # now we have all of the mappings we need - let's generate the text one character at a time
     globvar.debug_width_points = []
     for i, char in enumerate(text):
-        globvar.debug_width_points.append([current_draw_x*globvar.EM_TO_FONT_SCALE,
-                                           current_draw_y*globvar.EM_TO_FONT_SCALE])
+        globvar.debug_width_points.append([current_draw_x,
+                                           current_draw_y])
         t = i / string_length
         if char == ' ':
             if not starting_line:
-                current_draw_x += widest_glyph_width
+                current_draw_x += widest_glyph_width * globvar.EM_TO_FONT_SCALE
         else:
             starting_line = False
 
@@ -278,9 +305,11 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
 
             # generate the correct tween-glyph and move the draw_x accordingly
             lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_lerping_method, char_mapping, t)
+            lerped_glyph.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+            lerped_glyph.update_bounds()
+
             # make its left side aligned with (0, 0) and then push as needed
-            offset = np.array([current_draw_x, current_draw_y])
-            # lerped_glyph.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+            offset = np.array([current_draw_x, current_draw_y]) - lerped_glyph.get_upper_left_world()
             lerped_glyph.worldspace_offset_by(offset)
             lerped_glyph.update_bounds()
 
@@ -289,7 +318,7 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
 
         if wrap_x is not None and current_draw_x >= wrap_x:
             current_draw_x = 0
-            current_draw_y += widest_glyph_height
+            current_draw_y += tallest_glyph_height * globvar.EM_TO_FONT_SCALE
             starting_line = True
 
 

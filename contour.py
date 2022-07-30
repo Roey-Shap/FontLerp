@@ -466,11 +466,12 @@ class Contour(object):
             pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius*0.75)
         return
 
-    def draw_filled_polygon(self, surface, fill_color, width=1):
+    def draw_filled_polygon(self, surface, fill_color, width=1, flush_with_origin=True):
         # get all of the points of this contour's lines
         all_tween_points = []
         for curve in self.curves:
-            for tween_point in curve.tween_points:
+            reference_points = curve.unoffset_tween_points if flush_with_origin else curve.tween_points
+            for tween_point in reference_points:
                 all_tween_points.append(tween_point)
 
         fill_flag = self.fill
@@ -880,6 +881,29 @@ def lerp_contours_relative_proj(contour1, contour2, curve_mapping, t):
     return lerped_contour
 
 
+
+def get_unit_circle_contour():
+    circle_const = globvar.CIRCLE_CONST
+    circle_a1 = np.array([[0, 0],
+                          [circle_const, 0],
+                          [1, 1 - circle_const],
+                          [1, 1]])
+    circle_a2 = np.array([[1, 1],
+                          [1, 1 + circle_const],
+                          [circle_const, 2],
+                          [0, 2]])
+    circle_a3 = np.array([[0, 2],
+                          [-circle_const, 2],
+                          [-1, 1 + circle_const],
+                          [-1, 1]])
+    circle_a4 = np.array([[-1, 1],
+                          [-1, 1 - circle_const],
+                          [-circle_const, 0],
+                          [0, 0]])
+
+    circle = Contour()
+    circle.append_curves_from_np([circle_a1, circle_a2, circle_a3, circle_a4])
+    return circle
 
 # TODO fix or remove
 # def map_and_lerp(contour1, contour2, lerp_weight, mapping_function, lerping_function):

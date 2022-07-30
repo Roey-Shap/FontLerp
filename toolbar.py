@@ -33,6 +33,11 @@ class Toolbar(object):
                                                               "Click to view extra curve information",
                                                               global_manager.toggle_show_extra_curve_information,
                                                               self.standard_button_dimensions)
+        toggle_test_mixed_glyph_button = self.add_button("Toggle Morphing Glyph",
+                                                     "Shows a glyph displaying all interpolation states of a test letter",
+                                                     global_manager.toggle_lerped_glyph_display,
+                                                     self.standard_button_dimensions)
+
         make_reduction_mapping_button = self.add_button("Suggest Reduction Mapping",
                                                         "Make a mapping between the two active glyphs",
                                                         global_manager.make_mapping_from_active_glyphs,
