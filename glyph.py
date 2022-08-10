@@ -241,7 +241,7 @@ class Glyph(object):
         # TODO Could use another case; needs to be filled since the bounding box didn't change but the shape did (i.e. moving points)
         if not self.draw_surface_is_updated:
             self.draw_surface_is_updated = True
-            print("updated")
+            print("Updated draw surface of ", self)
 
             bounding_box = self.get_bounding_box_camera()
             self.draw_surface = pygame.Surface((round(bounding_box.width) + globvar.LINE_THICKNESS,

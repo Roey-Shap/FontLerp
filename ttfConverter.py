@@ -10,7 +10,7 @@ import numpy as np
 import global_variables as globvar
 import glyph
 
-def test_font_load(char, ttf_file_name):
+def load_char_from_font(char, ttf_file_name):
     # print("Font import information")
 
     font_url = "Test_Fonts/" + ttf_file_name
@@ -47,28 +47,10 @@ def test_font_load(char, ttf_file_name):
                 expanded.append(merge(last, item))
             expanded.append(item)
             last = item
-        # result = []
-        # last = expanded[-1]
-        # print(expanded)
-        # print("... done!")
+
 
         expanded_contours.append(expanded)
     return expanded_contours
-##########################
-    # g.compile(font)
-    #
-    # glyf = font['glyf']
-    # charglyf = glyf[ttfquery.glyphquery.glyphName(font, char)]
-    # print(charglyf.endPtsOfContours)
-    # print("===")
-    # print(charglyf.coordinates)
-    # for outline in g.outlines:
-    #     print(outline)
-    # contours = g.calculateContours(font)
-    # print("Contours:", len(contours))
-    # for contour in contours:
-    #     for point, flag in contour:
-    #         print(point, flag)
 
 
 def flip_y(p):
@@ -100,7 +82,7 @@ def convert_quadratic_flagged_points_to_contour(flagged_points):
 
 def glyph_from_font(char, font_file_name):
     g = glyph.Glyph(char)
-    extracted_font_data = test_font_load(char, font_file_name)
+    extracted_font_data = load_char_from_font(char, font_file_name)
     for cnt in extracted_font_data:
         formatted_contour = convert_quadratic_flagged_points_to_contour(cnt)
         formatted_contour.update_bounds()

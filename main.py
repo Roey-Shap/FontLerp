@@ -11,8 +11,9 @@ import numpy as np
 import custom_math
 import copy
 
+import custom_pygame
 import global_variables as globvar
-import toolbar
+import ptext
 import ttfConverter
 import fonts
 import custom_colors as colors
@@ -20,8 +21,6 @@ import global_manager
 
 
 import pygame
-import curve
-import contour
 import glyph
 
 print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFERENT FILL TYPES. PLAY"
@@ -50,21 +49,22 @@ global_manager.set_mapping_and_lerping_methods("Pillow Projection")
 glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS)
 
 
-# extracted_h1_data = ttfConverter.test_font_load("o", "AndikaNewBasic-B.ttf")
-# extracted_h2_data = ttfConverter.test_font_load("o", "OpenSans-Light.ttf")
-#
+test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf",
+              "Lora-Regular.ttf", "Alef-Regular.ttf"]
 
-test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf"]
 
 test_text = "More substantial text. This is a short poem written to test the wrapping capabilities."
-font1 = "Alef-Regular.ttf"
-font2 = "AndikaNewBasic-B.ttf"
+font1 = test_fonts[4]
+font2 = test_fonts[3]
 font_cursive = "Calligraffiti.ttf"
-#
+
 
 test_lerped_glyphs = None
-# test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
-#                                                          wrap_x=w)
+test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
+                                                         wrap_x=w*2)
+
+
+drawing_full_text_mode = test_lerped_glyphs is not None
 
 test_o = ttfConverter.glyph_from_font("q", font2)
 test_o.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
@@ -78,8 +78,8 @@ test_glyphs = []
 
 
 character = "p"
-extracted_h1_data = ttfConverter.test_font_load(character, font1)
-extracted_h2_data = ttfConverter.test_font_load(character, font_cursive)
+extracted_h1_data = ttfConverter.load_char_from_font(character, font1)
+extracted_h2_data = ttfConverter.load_char_from_font(character, font_cursive)
 test_h = glyph.Glyph(character)
 test_i = glyph.Glyph(character)
 for cnt in extracted_h1_data:
@@ -183,10 +183,10 @@ while running:
 
     # update Bezier curves in response to any points which changed
 
-
     for g in globvar.glyphs:
         glyph_changed = False
-        g.update_bounds()        # TODO Makes things smoother!
+        g.update_bounds()
+
         for cont in g.contours:
             for curve in cont.curves:
                 # check for updates in abstract points (whose positions are in WORLDSPACE)
@@ -194,10 +194,10 @@ while running:
                 glyph_changed = glyph_changed or curve_changed
                 # the curve has managed its own worldspace changes;
                 # update the curves based on the cursor's panning and offsetting
-                if just_stopped_scrolling or panned_camera:
+                if just_stopped_scrolling or panned_camera:     # TODO <<<< some redudancy here; caching the image means we don't need to update the cameraspace points when panning, really...
                     curve.update_points()
 
-        if scrolling or glyph_changed: # TODO Aaaaaaaaaaaaaaaaaaaaaaaaahhhhhhhhhhhhh
+        if scrolling or glyph_changed:
             print("GLYPH CHANGED ~LINE 196", g)
             g.reset_draw_surface()
 
@@ -225,7 +225,7 @@ while running:
 
 
 
-    # Rendering ===============================================================================================
+# Rendering ===============================================================================================
     if globvar.update_screen:
         screen.fill(colors.WHITE)
 
@@ -244,14 +244,14 @@ while running:
     if test_lerped_glyphs is not None:
         global_manager.draw_lerped_text(screen, test_lerped_glyphs)
 
-    for debug_point in globvar.debug_width_points:
-        pygame.draw.circle(screen, colors.BLUE, custom_math.world_to_cameraspace(np.array(debug_point)), 5)
+    # for debug_point in globvar.debug_width_points:
+    #     pygame.draw.circle(screen, colors.BLUE, custom_math.world_to_cameraspace(np.array(debug_point)), 5)
 
     if globvar.show_current_glyph_mapping:
         manager.draw_mapping_pillow_projection(screen, mappings)
 
 
-    test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
+    # test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
 
     if globvar.update_screen:
         # GUI drawing
@@ -260,8 +260,18 @@ while running:
 
     # Debug drawing
     if globvar.update_screen and globvar.DEBUG:
-        # pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
-        # pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(origin), 5)
+        # origin_coords = custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS)
+        # pygame.draw.circle(screen, colors.BLACK, origin_coords, 5)
+        # if globvar.DEBUG:
+        #     tsurf, tpos = ptext.draw((origin_coords[0], origin_coords[1]), color=colors.BLACK)
+        #     screen.blit(tsurf, tpos)
+        origin_coords = custom_pygame.np_to_ptext_coords(custom_math.world_to_cameraspace(origin))
+        pygame.draw.circle(screen, colors.BLACK, origin_coords, 5)
+        if globvar.DEBUG:
+            tsurf, tpos = ptext.draw(str((0, 0)), color=colors.BLACK,
+                                     left=origin_coords[0] + globvar.POINT_DRAW_RADIUS,
+                                     top=origin_coords[1] + globvar.POINT_DRAW_RADIUS)
+            screen.blit(tsurf, tpos)
 
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
