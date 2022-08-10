@@ -466,6 +466,11 @@ class Contour(object):
             pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius*0.75)
         return
 
+    def draw_control_points(self, surface):
+        for curve in self.curves:
+            curve.draw_control_points(globvar.screen, radius=globvar.POINT_DRAW_RADIUS)
+        return
+
     def draw_filled_polygon(self, surface, fill_color, width=1, flush_with_origin=True):
         # get all of the points of this contour's lines
         all_tween_points = []

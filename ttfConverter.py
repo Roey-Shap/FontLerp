@@ -108,6 +108,6 @@ def glyph_from_font(char, font_file_name):
         #     print(char, font_file_name)
         g.append_contour(formatted_contour)
 
-    g.update_bounds()
     g.sort_contours_by_fill()
+    g.update_bounds()
     return g

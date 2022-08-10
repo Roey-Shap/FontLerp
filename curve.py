@@ -125,17 +125,17 @@ class Curve(object):
             change_detected = change_detected or current_change
             if current_change:
                 self.worldspace_points[i] = (abs_point.np_coords()/globvar.CAMERA_ZOOM) + globvar.CAMERA_OFFSET
-        if change_detected:
-            # a change in some point was detected; update worldspace points, tween points, etc.
-            # could change just the potentially two curves affected, but I think it's fine.
-            self.update_points()
+        # if change_detected:
+        #     # a change in some point was detected; update cameraspace points, tween points, etc.
+        #     # could change just the potentially two curves affected, but I think it's fine.
+        #     self.update_points()
 
-        return
+        return change_detected
 
     """
     Draw the "control points" which influence the Curve's shape in between the endpoints
     """
-    def draw_control_points(self, surface, color, radius=1):
+    def draw_control_points(self, surface, radius=1):
         for abs_point in self.abstract_points:
             abs_point.draw(surface, radius)
         return
@@ -256,9 +256,8 @@ class Bezier(Curve):
 
         if globvar.show_extra_curve_information:
             self.draw_control_lines(surface, colors[0], width=width, flush_with_origin=flush_with_origin)
-            self.draw_control_points(surface, colors[2], radius=point_radius)
-
         return
+
 
     """
     Draws the lines connected the precomputed "render points

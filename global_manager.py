@@ -40,6 +40,7 @@ class GlobalManager(object):
         pygame.init()
         pygame.display.set_caption("Font Interpolater")
 
+
         return
 
     def step(self):
@@ -183,6 +184,10 @@ def toggle_show_extra_curve_information():
 
 def toggle_lerped_glyph_display():
     globvar.show_mixed_glyph = not globvar.show_mixed_glyph
+    return
+
+def toggle_debug_info():
+    globvar.DEBUG = not globvar.DEBUG
     return
 
 def make_mapping_from_active_glyphs():

@@ -41,11 +41,10 @@ origin = globvar.origin
 curves = globvar.curves
 toolbar = globvar.toolbar
 
-line_width = 3
+line_width = globvar.LINE_THICKNESS
 
 w, h = globvar.SCREEN_DIMENSIONS
 global_manager.set_mapping_and_lerping_methods("Pillow Projection")
-
 
 # create default glyph bounding box
 glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS)
@@ -90,7 +89,6 @@ for cnt in extracted_h1_data:
 test_h.worldspace_scale_by(0.1)
 test_h.worldspace_offset_by(np.array([w/4, h/2]))
 test_h.update_bounds()
-test_h.sort_contours_by_fill()
 # test_h.worldspace_offset_by(-test_h.get_center_world())
 
 
@@ -101,7 +99,6 @@ for cnt in extracted_h2_data:
 test_i.worldspace_scale_by(0.15)
 test_i.worldspace_offset_by(np.array([w*3/4, h/2]))
 test_i.update_bounds()
-test_i.sort_contours_by_fill()
 
 
 global_manager.set_active_glyphs(test_h, test_i)
@@ -120,8 +117,13 @@ mixed_glyph = None
 mappings = None
 global_manager.make_mapping_from_active_glyphs()
 
+# Do one step to update offsets and such
+for g in globvar.glyphs:
+    g.update_bounds()
+    g.update_all_curve_points()
+    g.reset_draw_surface()
 
-not_scrolling = True
+scrolling = False
 
 # Execution loop
 running = True
@@ -133,7 +135,7 @@ while running:
     clock.tick(globvar.FPS)
     globvar.mouse_scroll_directions = globvar.empty_offset
     prev_accuracy = globvar.BEZIER_ACCURACY
-    last_not_scrolling = not_scrolling
+    last_scrolling = scrolling
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -165,10 +167,11 @@ while running:
     globvar.mouse_held = mouse_held
     globvar.mouse_click_left = mouse_click_left
 
-    not_scrolling = np.all(np.isclose(globvar.mouse_scroll_directions, globvar.empty_offset))
-    just_stopped_scrolling = not_scrolling and not last_not_scrolling
+    scrolling = not np.all(np.isclose(globvar.mouse_scroll_directions, globvar.empty_offset))
+    just_stopped_scrolling = (not scrolling) and last_scrolling
 
     manager.step()
+
     panned_camera = cursor.panned_this_frame
 
 
@@ -179,13 +182,28 @@ while running:
             global_manager.calculate_t_array()
 
     # update Bezier curves in response to any points which changed
-    for curve in globvar.curves:
-        # check for updates in abstract points (whose positions are in WORLDSPACE)
-        curve.check_abstract_points()
 
-        # update the curves based on the cursor's panning and offsetting
-        if just_stopped_scrolling or panned_camera:
-            curve.update_points()
+
+    for g in globvar.glyphs:
+        glyph_changed = False
+        g.update_bounds()        # TODO Makes things smoother!
+        for cont in g.contours:
+            for curve in cont.curves:
+                # check for updates in abstract points (whose positions are in WORLDSPACE)
+                curve_changed = curve.check_abstract_points()
+                glyph_changed = glyph_changed or curve_changed
+                # the curve has managed its own worldspace changes;
+                # update the curves based on the cursor's panning and offsetting
+                if just_stopped_scrolling or panned_camera:
+                    curve.update_points()
+
+        if scrolling or glyph_changed: # TODO Aaaaaaaaaaaaaaaaaaaaaaaaahhhhhhhhhhhhh
+            print("GLYPH CHANGED ~LINE 196", g)
+            g.reset_draw_surface()
+
+
+
+
 
     glyph_box_offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
     glyph_box = pygame.Rect(glyph_box_offset_corner * globvar.CAMERA_ZOOM,
@@ -198,14 +216,13 @@ while running:
         globvar.lerped_glyph.destroy()
         globvar.lerped_glyph = None
 
-    for g in globvar.glyphs:
-        g.update_bounds()
 
 
     # Remix the glyph
     if globvar.current_glyph_mapping_is_valid and globvar.show_mixed_glyph:
         mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
         global_manager.lerp_active_glyphs(mix_t)
+
 
 
     # Rendering ===============================================================================================
@@ -234,15 +251,15 @@ while running:
         manager.draw_mapping_pillow_projection(screen, mappings)
 
 
+    test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
+
     if globvar.update_screen:
         # GUI drawing
         cursor.draw(screen)
         toolbar.draw(screen)
 
-    test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
-
     # Debug drawing
-    if globvar.update_screen: # TODO globvar.DEBUG and
+    if globvar.update_screen and globvar.DEBUG:
         # pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS), 5)
         # pygame.draw.circle(screen, colors.BLACK, custom_math.world_to_cameraspace(origin), 5)
 

@@ -25,6 +25,10 @@ class Toolbar(object):
         self.where_last_button_ends = 0
 
         self.buttons = []
+        toggle_debug_info_button = self.add_button("Toggle Debug Info Display",
+                                                    "Click to toggle debug information",
+                                                    global_manager.toggle_debug_info,
+                                                    self.standard_button_dimensions)
         toggle_mapping_display_button = self.add_button("Toggle Mapping Display",
                                                         "Click to view the mapping between the glyphs, if one exists",
                                                         global_manager.toggle_show_current_glyph_mapping,

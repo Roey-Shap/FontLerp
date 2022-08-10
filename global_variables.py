@@ -32,6 +32,7 @@ DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT = SCREEN_DIMENSIONS * np.array([1/5, 1/3])
 DEBUG_MESSAGE_POSITION = SCREEN_DIMENSIONS * np.array([0.5, 0.2])
 SCROLL_DELTA = 0.025
 POINT_DRAW_RADIUS = 3
+LINE_THICKNESS = 3
 POINTS_TO_CHECK_AVERAGE_WITH = 50                   # for the whole glyph we're getting the average for!
 POINTS_TO_GET_CONTOUR_MAPPING_WITH = 150            # for EACH contour
 EM_TO_FONT_SCALE = 0.07
@@ -54,7 +55,7 @@ update_screen = True
 hovered_point = None
 selected_point = None
 
-mouse_pos = None
+mouse_pos = [0, 0]
 mouse_click = None
 mouse_held = False
 mouse_click_left = False

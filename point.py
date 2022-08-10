@@ -69,6 +69,7 @@ class Point(object):
     def draw(self, surface, radius, debug_info=False):
         if not self.is_endpoint:
             radius *= 0.75
+
         color = custom_colors.mix_color(self.base_color, self.get_color(), 0.5)
         pygame.draw.circle(surface, color, self.np_coords(), radius)
 

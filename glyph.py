@@ -75,7 +75,7 @@ class Glyph(object):
     def worldspace_scale_by(self, scale):
         for contour in self.contours:
             contour.worldspace_scale_by(scale)
-
+        self.draw_surface_is_updated = False
         return
 
     def sort_contours_by_fill(self):
@@ -108,7 +108,16 @@ class Glyph(object):
             for curve in contour.curves:
                 curve.parent_glyph_upper_left = self.get_upper_left_camera()
 
+        return
+
+    def reset_draw_surface(self):
         self.draw_surface_is_updated = False
+        return
+
+    def update_all_curve_points(self):
+        for contour in self.contours:
+            for curve in contour.curves:
+                curve.update_points()
         return
 
     def get_upper_left_world(self):
@@ -232,8 +241,12 @@ class Glyph(object):
         # TODO Could use another case; needs to be filled since the bounding box didn't change but the shape did (i.e. moving points)
         if not self.draw_surface_is_updated:
             self.draw_surface_is_updated = True
+            print("updated")
+
             bounding_box = self.get_bounding_box_camera()
-            self.draw_surface = pygame.Surface((bounding_box.width, bounding_box.height), pygame.SRCALPHA, 32)
+            self.draw_surface = pygame.Surface((round(bounding_box.width) + globvar.LINE_THICKNESS,
+                                                round(bounding_box.height) + globvar.LINE_THICKNESS),
+                                               pygame.SRCALPHA, 32)
             self.draw_surface = self.draw_surface.convert_alpha()
 
 
@@ -244,18 +257,16 @@ class Glyph(object):
             # glyph_surface = pygame.Surface((bounding_box.width * (1+factor), bounding_box.height * (1+factor)))
             # glyph_surface.fill(custom_colors.WHITE)
 
-            s = self.draw_surface
-            # s = surface
 
             # first let them draw their respective fills
-            gray_value = 0.8 * 255
+            gray_value = 0.85 * 255
             fill_color = (gray_value, gray_value, gray_value)
-            for contour in self.contours:
-                contour.draw_filled_polygon(s, fill_color, width=width)
+            for cont in self.contours:
+                cont.draw_filled_polygon(self.draw_surface, fill_color, width=width)
 
             # then let them draw their respective outlines
-            for contour in self.contours:
-                contour.draw(s, radius, color=None, width=width)
+            for cont in self.contours:
+                cont.draw(self.draw_surface, radius, color=None, width=width)
 
                 # if True:
                 #     pnts = contour.get_points_along_from_fractions([0, 0.1, 0.5, 0.8, 0.95])
@@ -289,13 +300,19 @@ class Glyph(object):
                 #     #
                 #     #     break
 
+
+
             if True or globvar.show_extra_curve_information:
                 print("SHOWING GLYPH DEBUG INFO")
-                pygame.draw.circle(s, custom_colors.GREEN, self.get_upper_left_camera(), radius)
+                pygame.draw.circle(self.draw_surface, custom_colors.GREEN, self.get_upper_left_camera(), radius)
                 # pygame.draw.circle(surface, custom_colors.GREEN, self.get_lower_right_camera(), radius)
                 # pygame.draw.circle(s, custom_colors.RED, self.get_center_camera(), radius)
-
         surface.blit(self.draw_surface, self.get_upper_left_camera())
+
+        # let each contour draw their points
+        if globvar.show_extra_curve_information:
+            for cont in self.contours:
+                cont.draw_control_points(surface)
         return
 
 def calc_contour_score_MSE(contour1, contour2):
