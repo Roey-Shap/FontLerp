@@ -311,8 +311,19 @@ class Bezier(Curve):
 
     # TODO Implement Cubic splitting - maybe even also quad -> cubic split? We'll see if it's still useful...
     def de_casteljau_cubic(self, t):
-        raise ValueError("UNIMPLEMENTED")
-        return
+        A, B, C, D = self.worldspace_points
+        E = custom_math.interpolate_np(A, B, t)
+        F = custom_math.interpolate_np(B, C, t)
+        G = custom_math.interpolate_np(C, D, t)
+
+        H = custom_math.interpolate_np(E, F, t)
+        I = custom_math.interpolate_np(F, G, t)
+
+        J = custom_math.interpolate_np(H, I, t)
+        cubic1 = Bezier(np.array([A, E, H, J]))
+        cubic2 = Bezier(np.array([J, I, G, D]))
+
+        return cubic1, cubic2
 
 
         # beta = [c for c in self.worldspace_points]  # values in this list are overridden

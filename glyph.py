@@ -488,3 +488,9 @@ def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_inf
     print("lerped glyph:", glyph1.character_code, "has", len(lerped_glpyh), "contours")
     return lerped_glpyh
 
+def glyph_from_curves(curves):
+    cont = contour.Contour()
+    cont.append_curve_multi(curves)
+    g = Glyph()
+    g.append_contour(cont)
+    return g

@@ -41,20 +41,24 @@ class Toolbar(object):
                                                      "Shows a glyph displaying all interpolation states of a test letter",
                                                      global_manager.toggle_lerped_glyph_display,
                                                      self.standard_button_dimensions)
+        split_curve_button = self.add_button("Split Test Curve [DEBUG]",
+                                              "----",
+                                              global_manager.split_test_debug_curve,
+                                              self.standard_button_dimensions)
 
-        make_reduction_mapping_button = self.add_button("Suggest Reduction Mapping",
-                                                        "Make a mapping between the two active glyphs",
-                                                        global_manager.make_mapping_from_active_glyphs,
-                                                        self.standard_button_dimensions)
-        point_manipulation_button = self.add_button("Manipulate Points",
-                                                     "Drag points around",
-                                                     global_manager.go_into_point_manipulation_mode,
-                                                     self.standard_button_dimensions)
-
-        make_custom_mapping_button = self.add_button("Create New Custom Reduction Mapping",
-                                                     "Make your own mapping between the two active glyphs",
-                                                     global_manager.add_custom_mapping,
-                                                     self.standard_button_dimensions)
+        # make_reduction_mapping_button = self.add_button("Suggest Reduction Mapping",
+        #                                                 "Make a mapping between the two active glyphs",
+        #                                                 global_manager.make_mapping_from_active_glyphs,
+        #                                                 self.standard_button_dimensions)
+        # point_manipulation_button = self.add_button("Manipulate Points",
+        #                                              "Drag points around",
+        #                                              global_manager.go_into_point_manipulation_mode,
+        #                                              self.standard_button_dimensions)
+        #
+        # make_custom_mapping_button = self.add_button("Create New Custom Reduction Mapping",
+        #                                              "Make your own mapping between the two active glyphs",
+        #                                              global_manager.add_custom_mapping,
+        #                                              self.standard_button_dimensions)
 
         return
 

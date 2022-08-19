@@ -21,6 +21,7 @@ import global_manager
 
 
 import pygame
+import contour
 import glyph
 
 print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFERENT FILL TYPES. PLAY"
@@ -43,7 +44,7 @@ toolbar = globvar.toolbar
 line_width = globvar.LINE_THICKNESS
 
 w, h = globvar.SCREEN_DIMENSIONS
-global_manager.set_mapping_and_lerping_methods("Pillow Projection")
+global_manager.set_mapping_and_lerping_methods("Relative Projection")
 
 # create default glyph bounding box
 glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS)
@@ -60,8 +61,8 @@ font_cursive = "Calligraffiti.ttf"
 
 
 test_lerped_glyphs = None
-test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
-                                                         wrap_x=w*2)
+# test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
+#                                                          wrap_x=w*2)
 
 
 drawing_full_text_mode = test_lerped_glyphs is not None
@@ -104,18 +105,31 @@ test_i.update_bounds()
 global_manager.set_active_glyphs(test_h, test_i)
 
 # CIRCLE
-# circle = contour.get_unit_circle_contour()
-# circle_size = 100
-# circle_g = glyph.Glyph()
-# circle_g.append_contour(circle)
-# circle_g.worldspace_scale_by(circle_size)
-# circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
-# circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
+circle = contour.get_unit_circle_contour()
+circle_size = 100
+circle_g = glyph.Glyph()
+circle_g.append_contour(circle)
+circle_g.worldspace_scale_by(circle_size)
+circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
+circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
 
 
+
+# testing quadratic bezier split
+curve1 = circle.curves[0]
+curve_test = glyph.glyph_from_curves([curve1])
+
+globvar.test_curves = [curve_test]
+
+
+
+
+
+# Start execution ============================
 mixed_glyph = None
 mappings = None
 global_manager.make_mapping_from_active_glyphs()
+
 
 # Do one step to update offsets and such
 for g in globvar.glyphs:
@@ -203,8 +217,6 @@ while running:
 
 
 
-
-
     glyph_box_offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
     glyph_box = pygame.Rect(glyph_box_offset_corner * globvar.CAMERA_ZOOM,
                             globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS * globvar.CAMERA_ZOOM)
@@ -222,7 +234,6 @@ while running:
     if globvar.current_glyph_mapping_is_valid and globvar.show_mixed_glyph:
         mix_t = custom_math.map(np.sin(time.time()), -1, 1, 0, 1)
         global_manager.lerp_active_glyphs(mix_t)
-
 
 
 # Rendering ===============================================================================================
@@ -251,7 +262,13 @@ while running:
         manager.draw_mapping_pillow_projection(screen, mappings)
 
 
+
+    for test_curve in globvar.test_curves:
+        test_curve.draw(screen, point_radius)
+
     # test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
+
+
 
     if globvar.update_screen:
         # GUI drawing

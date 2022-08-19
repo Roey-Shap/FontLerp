@@ -190,6 +190,19 @@ def toggle_debug_info():
     globvar.DEBUG = not globvar.DEBUG
     return
 
+def split_test_debug_curve():
+    split_curves = []
+    for g in globvar.test_curves:
+        for cont in g.contours:
+            for c in cont.curves:
+                piece1, piece2 = c.de_casteljau(0.5)
+                split_curves.append(glyph.glyph_from_curves([piece1]))
+                split_curves.append(glyph.glyph_from_curves([piece2]))
+
+    globvar.test_curves = split_curves
+
+
+
 def make_mapping_from_active_glyphs():
     g1, g2 = globvar.active_glyphs
     globvar.current_glyph_mapping, globvar.glyph_score = glyph.find_glyph_contour_mapping(g1, g2, globvar.current_glyph_mapping_method)
@@ -200,10 +213,12 @@ def make_mapping_from_active_glyphs():
 def lerp_active_glyphs(t):
     g1, g2 = globvar.active_glyphs
     globvar.lerped_glyph = glyph.lerp_glyphs(g1, g2,
-                                             contour.lerp_contours_pillow_proj,
+                                             globvar.current_glyph_lerping_method,
                                              globvar.current_glyph_mapping, t)
     globvar.lerped_glyph.worldspace_offset_by(-globvar.lerped_glyph.get_upper_left_world())
     globvar.lerped_glyph.update_bounds()
+    globvar.lerped_glyph.update_all_curve_points()
+    globvar.lerped_glyph.reset_draw_surface()
     return
 
 def go_into_point_manipulation_mode():

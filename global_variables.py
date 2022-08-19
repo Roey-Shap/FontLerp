@@ -97,7 +97,7 @@ glyphs = []
 glyph_mappings = {}            # a dictionary of key:value pairs (g1, g2): [custom_map, reduction_map, insertion_map]
 
 
-
+test_curves = None
 
 
 cur_character_lerped = "X"
