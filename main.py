@@ -54,7 +54,7 @@ test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf",
               "Lora-Regular.ttf", "Alef-Regular.ttf", "Lora-Italic.ttf", "Alef-Bold.ttf"]
 
 
-test_text = "BBBBBBBBBBBB"
+test_text = "Yeah! It is good enough for now!"
 font1 = test_fonts[4]
 font1_bold = test_fonts[6]
 font2 = test_fonts[3]
@@ -63,8 +63,8 @@ font_cursive = "Calligraffiti.ttf"
 
 
 test_lerped_glyphs = None
-test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font1_bold,
-                                                         wrap_x=w*2)
+test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
+                                                         wrap_x=w)
 
 
 drawing_full_text_mode = test_lerped_glyphs is not None
