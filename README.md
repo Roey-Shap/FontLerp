@@ -16,7 +16,7 @@ https://pdfhost.io/v/7zebevzBv_FontLerp_Article_1_Export_1
 Here are some videos of it in action!
 https://www.youtube.com/playlist?list=PLRIDiXsuDNc0miu8VrzF59OjqiXGUh6ZN
 
-<br><br>
+<br>
 
 Almost all of the code is mine; I used ttfQuery (ripped it apart a bit for my specific needs...) to pull font data from TTF files, and, obviously, didn't create any of the fonts themselves. They're just in there for testing purposes.
 
