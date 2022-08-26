@@ -41,6 +41,10 @@ class Toolbar(object):
                                                      "Shows a glyph displaying all interpolation states of a test letter",
                                                      global_manager.toggle_lerped_glyph_display,
                                                      self.standard_button_dimensions)
+        toggle_test_lerped_text_button = self.add_button("Toggle Entire Lerped Text",
+                                                         "Displays text lerped gradually from one font to another",
+                                                         global_manager.toggle_lerped_text_display,
+                                                         self.standard_button_dimensions)
         split_curve_button = self.add_button("Split Test Curve [DEBUG]",
                                               "----",
                                               global_manager.split_test_debug_curve,

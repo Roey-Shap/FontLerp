@@ -174,6 +174,9 @@ def set_active_glyphs(g1, g2):
     globvar.active_glyphs = [g1, g2]
     return
 
+
+# Button functions ###
+
 def toggle_show_current_glyph_mapping():
     globvar.show_current_glyph_mapping = not globvar.show_current_glyph_mapping
     return
@@ -201,7 +204,11 @@ def split_test_debug_curve():
 
     globvar.test_curves = split_curves
 
+def toggle_lerped_text_display():
+    globvar.show_lerped_glyph_text = not globvar.show_lerped_glyph_text
+    return
 
+# #######
 
 def make_mapping_from_active_glyphs():
     g1, g2 = globvar.active_glyphs
@@ -209,6 +216,7 @@ def make_mapping_from_active_glyphs():
     # insert_reduction_glyph_mapping(g1, g2, globvar.current_glyph_mapping)
     globvar.current_glyph_mapping_is_valid = True
     return
+
 
 def lerp_active_glyphs(t):
     g1, g2 = globvar.active_glyphs
@@ -346,5 +354,5 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
 
 def draw_lerped_text(surface, lerped_glyphs):
     for g in lerped_glyphs:
-        g.draw(surface, globvar.POINT_DRAW_RADIUS)
+        g.draw(surface, globvar.POINT_DRAW_RADIUS, color=(0, 0, 0))
     return

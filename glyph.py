@@ -233,7 +233,7 @@ class Glyph(object):
         # camera_dimensions = np.array([self.width, self.height]) * globvar.CAMERA_ZOOM
         # return upper_left + (camera_dimensions/2)
 
-    def draw(self, surface, radius, width=1):
+    def draw(self, surface, radius, width=1, color=None):
         # drawing a glyph is expensive; let's draw it once everytime the user zooms
         # when the user pans, we can just draw where we draw the glyph's *surface*
         # see the Glyph class' "worldspace_scale_by". It's there that we let the surface be None
@@ -266,7 +266,7 @@ class Glyph(object):
 
             # then let them draw their respective outlines
             for cont in self.contours:
-                cont.draw(self.draw_surface, radius, color=None, width=width)
+                cont.draw(self.draw_surface, radius, color=color, width=width)
 
                 # if True:
                 #     pnts = contour.get_points_along_from_fractions([0, 0.1, 0.5, 0.8, 0.95])
@@ -280,26 +280,10 @@ class Glyph(object):
                 #         col = round(255 * i / num_pnts)
                 #         pygame.draw.circle(surface, (0, col, col), camera_coords, 4)
 
-            # if True:
-                #     pnts_dict = contour.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
-                #                                                         return_relative_to_upper_left_curve=True)
-                #     num_pnts = sum(len(pnts) for pnts in pnts_dict.values())
-                #     for i, pair in enumerate(pnts_dict.items()):
-                #         curve_index, pnts = pair
-                #         for adj_index, coords in pnts:
-                #             camera_coords = custom_math.world_to_cameraspace(coords)
-                #             camera_coords = (camera_coords[0], camera_coords[1])
-                #             # print(camera_coords)
-                #
-                #             # tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
-                #             # globvar.screen.blit(tsurf, tpos)
-                #             col = round(255 * adj_index / num_pnts)
-                #             pygame.draw.circle(surface, (0, col, 0), camera_coords, 3)
                 #
                 #     # if i == round(time.time()) % len(contour):
                 #     #
                 #     #     break
-
 
 
             if True or globvar.show_extra_curve_information:
@@ -308,6 +292,26 @@ class Glyph(object):
                 # pygame.draw.circle(surface, custom_colors.GREEN, self.get_lower_right_camera(), radius)
                 # pygame.draw.circle(s, custom_colors.RED, self.get_center_camera(), radius)
         surface.blit(self.draw_surface, self.get_upper_left_camera())
+
+
+        if False:
+            for cont in self.contours:
+                pnts_dict = cont.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
+                                                                    return_relative_to_upper_left_curve=True)
+                num_pnts = sum(len(pnts) for pnts in pnts_dict.values())
+                for i, pair in enumerate(pnts_dict.items()):
+                    curve_index, pnts = pair
+                    for adj_index, coords in pnts:
+                        camera_coords = custom_math.world_to_cameraspace(coords)
+                        camera_coords = (camera_coords[0], camera_coords[1])
+                        # print(camera_coords)
+
+                        # tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
+                        # globvar.screen.blit(tsurf, tpos)
+                        col = round(255 * adj_index / num_pnts)
+                        pygame.draw.circle(surface, (0, col, 0), camera_coords, 3)
+
+
 
         # let each contour draw their points
         if globvar.show_extra_curve_information:

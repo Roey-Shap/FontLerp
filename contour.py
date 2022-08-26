@@ -350,6 +350,9 @@ class Contour(object):
         return result
 
 
+    """
+    Return a list of points along this contour corresponding to the list of fractions given
+    """
     def get_points_along_from_fractions(self, fractions_along_of_points,
                                         return_with_curves=False):
 
@@ -447,10 +450,12 @@ class Contour(object):
         no_input_color = color is None
         for i, curve in enumerate(self.curves):
             if no_input_color:
-                color = [custom_colors.LT_GRAY,
+                final_color = [custom_colors.LT_GRAY,
                                 custom_colors.mix_color(custom_colors.GREEN, custom_colors.RED, (i+1)/(len(self)+1)),
                                 custom_colors.GRAY]
-            curve.draw(surface, radius, color, width=width)
+            else:
+                final_color = [color, color, color]
+            curve.draw(surface, radius, final_color, width=width)
 
         # draw debug information (center, etc.)
         if globvar.show_extra_curve_information:
@@ -615,7 +620,8 @@ def find_relative_projection_mapping(contour1: Contour, contour2: Contour):
     for contour in contours:
         equidis_points = contour.get_equally_spaced_points_along(num_sample_points)
 
-        anchor = contour.get_upper_left_world()         # TODO maybe change this to whichever anchor which minimizes MSE to both contours' centers?
+        # anchor = contour.get_upper_left_world()         # TODO maybe change this to whichever anchor which minimizes MSE to both contours' centers?
+        anchor = contour.get_anchor_world()
 
         # find the point closest to the anchor
         start_point = custom_math.find_point_closest_to_anchor(anchor, equidis_points, return_point_index=True)
@@ -633,6 +639,7 @@ def find_relative_projection_mapping(contour1: Contour, contour2: Contour):
         equidis_points = list(equidis_points.values())
 
         equidis_point_lists.append(equidis_points)
+        globvar.random_debug_points.append(equidis_points[0])
 
         # we now need to find the approximate locations of this contour's control points compared to these unit points
         control_point_percentages = {curve: [] for curve in contour.curves}
@@ -726,6 +733,16 @@ def find_relative_projection_mapping(contour1: Contour, contour2: Contour):
         # e.g. if contour_being_split = contour1 then my_control_points_fractions = c1_control_points_fractions
         my_control_points_fractions = control_point_percentages_dicts[contour_index]
         their_control_point_fractions_all = control_point_percentages_lists[1 - contour_index]
+
+        # TODO === TESTING ===
+        # testing that the points being found, in fractional form, are reflected correctly;
+        # take each OTHER contour's fraction-unit points (FUPs) and place them onto this one,
+        # in index order so they can be differentiated later
+        both_contours = [contour1, contour2]
+        others_marked_points = both_contours[contour_index].get_points_along_from_fractions(their_control_point_fractions_all)
+        globvar.marking_test_points_lists.append(others_marked_points)
+        # TODO === TESTING ===
+
         split_contour = Contour()
         split_contours.append(split_contour)
 
@@ -909,6 +926,25 @@ def get_unit_circle_contour():
     circle = Contour()
     circle.append_curves_from_np([circle_a1, circle_a2, circle_a3, circle_a4])
     return circle
+
+def get_unit_polygon_contour(sides, scale, angle_offset=0):
+    if sides < 3:
+        raise ValueError("Polygon Contour must have at least 3 sides.")
+    vertices = [np.array([np.cos(angle_offset-(np.pi/2) + (i*2*np.pi/sides)),
+                          np.sin(angle_offset-(np.pi/2) + (i*2*np.pi/sides))])*scale for i in range(sides)]
+
+    polygon = Contour()
+
+    for i in range(sides):
+        vertex = vertices[i]
+        next_vertex = vertices[(i+1) % sides]
+
+        side = curve.Bezier(np.array([vertex, custom_math.interpolate_np(vertex, next_vertex, 0.5), next_vertex]))
+        polygon.append_curve(side)
+        print(vertex, next_vertex)
+
+    return polygon
+
 
 # TODO fix or remove
 # def map_and_lerp(contour1, contour2, lerp_weight, mapping_function, lerping_function):

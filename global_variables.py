@@ -37,9 +37,9 @@ POINTS_TO_CHECK_AVERAGE_WITH = 50                   # for the whole glyph we're 
 POINTS_TO_GET_CONTOUR_MAPPING_WITH = 150            # for EACH contour
 EM_TO_FONT_SCALE = 0.07
 
-up_lefters = "cegiklmnoswx"
+up_lefters = "cegikmnoswx"
 up_righters = "fr"
-down_righters = "bhjpqyz"
+down_righters = "bhjlpqyz"
 down_lefters = "adtuv"
 
 
@@ -66,7 +66,8 @@ KEY_SPACE_PRESSED = False
 
 show_current_glyph_mapping = False
 show_extra_curve_information = False
-show_mixed_glyph = False
+show_mixed_glyph = True
+show_lerped_glyph_text = True
 
 BEZIER_ACCURACY = 4
 t_values = None
@@ -97,7 +98,9 @@ glyphs = []
 glyph_mappings = {}            # a dictionary of key:value pairs (g1, g2): [custom_map, reduction_map, insertion_map]
 
 
-test_curves = None
+test_curves = []
+marking_test_points_lists = []
 
+random_debug_points = []
 
 cur_character_lerped = "X"

@@ -44,25 +44,27 @@ toolbar = globvar.toolbar
 line_width = globvar.LINE_THICKNESS
 
 w, h = globvar.SCREEN_DIMENSIONS
-global_manager.set_mapping_and_lerping_methods("Relative Projection")
+global_manager.set_mapping_and_lerping_methods("Pillow Projection")
 
 # create default glyph bounding box
 glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS)
 
 
 test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf",
-              "Lora-Regular.ttf", "Alef-Regular.ttf"]
+              "Lora-Regular.ttf", "Alef-Regular.ttf", "Lora-Italic.ttf", "Alef-Bold.ttf"]
 
 
-test_text = "More substantial text. This is a short poem written to test the wrapping capabilities."
+test_text = "BBBBBBBBBBBB"
 font1 = test_fonts[4]
+font1_bold = test_fonts[6]
 font2 = test_fonts[3]
+font2_italic = test_fonts[5]
 font_cursive = "Calligraffiti.ttf"
 
 
 test_lerped_glyphs = None
-# test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
-#                                                          wrap_x=w*2)
+test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font1_bold,
+                                                         wrap_x=w*2)
 
 
 drawing_full_text_mode = test_lerped_glyphs is not None
@@ -77,51 +79,48 @@ test_o.update_bounds()
 test_glyphs = []
 
 
+active_letter_initial_scale = 1
+character = "o"
+test_h = ttfConverter.glyph_from_font(character, font1)
+test_i = ttfConverter.glyph_from_font(character, font_cursive)
 
-character = "p"
-extracted_h1_data = ttfConverter.load_char_from_font(character, font1)
-extracted_h2_data = ttfConverter.load_char_from_font(character, font_cursive)
-test_h = glyph.Glyph(character)
-test_i = glyph.Glyph(character)
-for cnt in extracted_h1_data:
-    formatted_contour = ttfConverter.convert_quadratic_flagged_points_to_contour(cnt)
-    test_h.append_contour(formatted_contour)
-# test_h.prune_curves()
-test_h.worldspace_scale_by(0.1)
-test_h.worldspace_offset_by(np.array([w/4, h/2]))
-test_h.update_bounds()
-# test_h.worldspace_offset_by(-test_h.get_center_world())
+test_h.worldspace_scale_by(0.1 * active_letter_initial_scale)
+test_i.worldspace_scale_by(0.15 * active_letter_initial_scale)
 
 
-for cnt in extracted_h2_data:
-    formatted_contour = ttfConverter.convert_quadratic_flagged_points_to_contour(cnt)
-    test_i.append_contour(formatted_contour)
 
-test_i.worldspace_scale_by(0.15)
-test_i.worldspace_offset_by(np.array([w*3/4, h/2]))
-test_i.update_bounds()
 
 
 global_manager.set_active_glyphs(test_h, test_i)
 
 # CIRCLE
-circle = contour.get_unit_circle_contour()
-circle_size = 100
-circle_g = glyph.Glyph()
-circle_g.append_contour(circle)
-circle_g.worldspace_scale_by(circle_size)
-circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
-circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
+# circle = contour.get_unit_circle_contour()
+# circle_size = 100
+# circle_g = glyph.Glyph()
+# circle_g.append_contour(circle)
+# circle_g.worldspace_scale_by(circle_size)
+# circle_g.worldspace_offset_by(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT)
+# circle_g.worldspace_offset_by(np.array([circle_size, 0], dtype=globvar.POINT_NP_DTYPE))
+#
+#
+#
+# # testing quadratic bezier split
+# curve1 = circle.curves[0]
+# curve_test = glyph.glyph_from_curves([curve1])
+#
 
-
-
-# testing quadratic bezier split
-curve1 = circle.curves[0]
-curve_test = glyph.glyph_from_curves([curve1])
-
-globvar.test_curves = [curve_test]
-
-
+# polygon_size = 100
+# tri = contour.get_unit_polygon_contour(3, polygon_size)
+# g_tri = glyph.Glyph()
+# g_tri.append_contour(tri)
+#
+# hex = contour.get_unit_polygon_contour(6, polygon_size, np.pi / 6)
+# g_hex = glyph.Glyph()
+# g_hex.append_contour(hex)
+#
+#
+#
+# global_manager.set_active_glyphs(g_hex, g_tri)
 
 
 
@@ -130,6 +129,11 @@ mixed_glyph = None
 mappings = None
 global_manager.make_mapping_from_active_glyphs()
 
+
+# make the active glyphs in nice places
+g1, g2 = globvar.active_glyphs
+g1.worldspace_offset_by(np.array([w/4, h/2]))
+g2.worldspace_offset_by(np.array([w*2/4, h/2]))
 
 # Do one step to update offsets and such
 for g in globvar.glyphs:
@@ -243,25 +247,42 @@ while running:
     # Left glyph unit boundaries
     border_width = 1
     corner_rad = 3
-    pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
+    # pygame.draw.rect(screen, colors.BLACK, glyph_box, border_width, corner_rad, corner_rad, corner_rad, corner_rad)
 
     if globvar.lerped_glyph is not None and globvar.show_mixed_glyph:
         globvar.lerped_glyph.draw(screen, point_radius)
-
+        for active_glyph in globvar.active_glyphs:
+            active_glyph.update_all_curve_points()      # TODO in theory can be limited to just when scrolling happens
+            active_glyph.draw(screen, point_radius)
 
     # test_h.draw(screen, point_radius)
     # test_i.draw(screen, point_radius)
 
-    if test_lerped_glyphs is not None:
+    for i, l in enumerate(globvar.marking_test_points_lists):
+        active_glyph_offset = globvar.active_glyphs[1-i].get_upper_left_camera()
+        num_points = len(l)
+        for p_i, p in enumerate(l):
+            if p_i % 1 == 0:
+                p = custom_math.world_to_cameraspace(p) + active_glyph_offset
+                # pygame.draw.circle(screen, (0, 0, 0), custom_math.world_to_cameraspace(p) + active_glyph_offset, (p_i+1) * 5/num_points)
+                centered_pos = (p[0], p[1])
+                tsurf, tpos = ptext.draw(str(p_i), color=(0, 0, 0), center=centered_pos)
+                screen.blit(tsurf, tpos)
+
+    for i, pnt in enumerate(globvar.random_debug_points):
+        active_glyph_offset = globvar.active_glyphs[1-i].get_upper_left_camera()
+        pygame.draw.circle(screen, (0, 255, 0), custom_math.world_to_cameraspace(pnt) + active_glyph_offset, 5)
+
+    if test_lerped_glyphs is not None and globvar.show_lerped_glyph_text:
         global_manager.draw_lerped_text(screen, test_lerped_glyphs)
 
     # for debug_point in globvar.debug_width_points:
     #     pygame.draw.circle(screen, colors.BLUE, custom_math.world_to_cameraspace(np.array(debug_point)), 5)
 
+    # tri.draw_filled_polygon(screen, globvar.POINT_DRAW_RADIUS)
+
     if globvar.show_current_glyph_mapping:
         manager.draw_mapping_pillow_projection(screen, mappings)
-
-
 
     for test_curve in globvar.test_curves:
         test_curve.draw(screen, point_radius)
