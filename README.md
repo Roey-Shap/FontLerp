@@ -1,4 +1,4 @@
-"# FontLerp" 
+# FontLerp
 
 Copyright (c) 2022, Roey Shapiro
 All rights reserved.
