@@ -1,11 +1,9 @@
 """
-Defines a Button object and its callback function.
+Defines a Button object and its callback on-click function.
 """
 
 import pygame
-import global_variables as globvar
 
-import fonts
 import custom_colors
 import custom_pygame
 import ptext
@@ -14,6 +12,7 @@ class Button(object):
     COLOR_IDLE = custom_colors.LT_GRAY
     COLOR_CLICK = custom_colors.GRAY
     COLOR_HOVER = custom_colors.mix_color(COLOR_IDLE, COLOR_CLICK, 0.5)
+
     def __init__(self, label, information, function, position, dimensions):
         self.label = label
         self.information = information
@@ -43,7 +42,6 @@ class Button(object):
             return self.COLOR_HOVER
         return self.COLOR_IDLE
 
-
     def draw(self, surface):
         outline = pygame.Rect(self.x, self.y, self.width, self.height)
 
@@ -59,7 +57,6 @@ class Button(object):
         tsurf, tpos = ptext.draw(self.label, color=custom_colors.BLACK, width=self.width, lineheight=1.5, center=centered_pos)
         surface.blit(tsurf, tpos)
         return
-
 
     def check_mouse_hover(self, mouse_pos, mouse_click_left):
         bounding_box = self.get_bounding_box()

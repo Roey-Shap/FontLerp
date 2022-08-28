@@ -1,21 +1,31 @@
-import contour
-import custom_math
-import global_variables as globvar
 import numpy as np
 import pygame
+
+import contour
+import glyph
+
+import custom_math
+import global_variables as globvar
 import custom_colors
 import ptext
-import glyph
+
 import ttfConverter
 import toolbar
 import cursor
 
+"""
+Represents the global manager object, which controls which state the editor is in.
+For example, is the user manipulating points? If so, how does that change the effect of their mouse input?
+
+Also manages assigning glyphs as active and interpolating between them
+"""
 class GlobalManager(object):
     class State(int):
         NO_TOOL = 0
         ADJUSTING_POINTS = 1
         ADDING_CURVES = 2
         MAPPING_CURVES = 3
+
 
     class MappingCurveState(int):
         OMIN = 0
@@ -40,7 +50,6 @@ class GlobalManager(object):
         pygame.init()
         pygame.display.set_caption("Font Interpolater")
 
-
         return
 
     def step(self):
@@ -53,98 +62,65 @@ class GlobalManager(object):
         if self.state == self.State.MAPPING_CURVES:
             self.step_mapping_curves()
 
-
+    # @TODO
     def step_adjusting_points(self):
         return
 
-
+    # @TODO
     def step_mapping_curves(self):
         return
 
-    def draw_mapping_pillow_projection(self, surface, point_mappings):
-        # # if globvar.current_glyph_mapping is None:
-        # #     pos = (globvar.DEBUG_MESSAGE_POSITION[0], globvar.DEBUG_MESSAGE_POSITION[1])
-        # #     tsurf, tpos = ptext.draw("No mapping currently active...",
-        # #                              pos,
-        # #                              color=custom_colors.BLACK)
-        # #     surface.blit(tsurf, tpos)
-        # #     return
-        #
-        # # mappings = globvar.current_glyph_mapping
-        # glyph1, glyph2 = globvar.active_glyphs
-        #
-        # start_color = custom_colors.NEON_BLUE
-        # end_color = custom_colors.NEON_RED
-        # total_mappings = len(point_mappings)
-        # # iterate through each contour of G1 and show the curve that it's mapped to in G2
-        # for g1_contour_index in point_mappings:
-        #     g2_contour_index, point_mapping = point_mappings[g1_contour_index]
-        #     current_mapped_contours_color = custom_colors.mix_color(start_color, end_color, g1_contour_index / total_mappings)
-        #     if g1_contour_index == total_mappings - 1:
-        #         current_mapped_contours_color = end_color
-        #
-        #     g1_contour = glyph1.contours[g1_contour_index]
-        #     g2_contour = glyph2.contours[g2_contour_index]
-        #
-        #     # take each pair in the mapping; if it's not a null, draw a line
-        #     for p1, p2 in point_mapping.values():
-        #         pygame.draw.line(surface, current_mapped_contours_color, p1, p2)
-        #
-        #         # draw over the current contour outline with this color
-        #         g1_contour.draw(surface, globvar.POINT_DRAW_RADIUS, [current_mapped_contours_color]*3)
-        #         g2_contour.draw(surface, globvar.POINT_DRAW_RADIUS, [current_mapped_contours_color]*3)
-        #
-        #
 
-
+# @TODO Implemented a while ago - needs to be redone
+"""
+Draw lines between each of the beziers based on the mappings provided
+"""
+def draw_mapping_reduction(self, surface):
+    if globvar.current_glyph_mapping is None:
+        pos = (globvar.DEBUG_MESSAGE_POSITION[0], globvar.DEBUG_MESSAGE_POSITION[1])
+        tsurf, tpos = ptext.draw("No mapping currently active...",
+                                 pos,
+                                 color=custom_colors.BLACK)
+        surface.blit(tsurf, tpos)
         return
 
-    """
-    Draw lines between each of the beziers based on the mappings provided
-    """
-    def draw_mapping_reduction(self, surface):
-        if globvar.current_glyph_mapping is None:
-            pos = (globvar.DEBUG_MESSAGE_POSITION[0], globvar.DEBUG_MESSAGE_POSITION[1])
-            tsurf, tpos = ptext.draw("No mapping currently active...",
-                                     pos,
-                                     color=custom_colors.BLACK)
-            surface.blit(tsurf, tpos)
-            return
+    glyph1, glyph2 = globvar.active_glyphs
+    mappings = globvar.current_glyph_mapping
 
-        glyph1, glyph2 = globvar.active_glyphs
-        mappings = globvar.current_glyph_mapping
+    n1 = len(glyph1)
+    n2 = len(glyph2)
 
-        n1 = len(glyph1)
-        n2 = len(glyph2)
+    if n2 > n1:
+        raise AttributeError("Glyph 1 needs to have at least as many curves as Glyph 2 to draw the correct mapping")
 
-        if n2 > n1:
-            raise AttributeError("Glyph 1 needs to have at least as many curves as Glyph 2 to draw the correct mapping")
+    start_color = custom_colors.NEON_BLUE
+    end_color = custom_colors.NEON_RED
+    total_mappings = len(mappings)
+    # iterate through each contour of G1 and show the curve that it's mapped to in G2
+    for g1_contour_index in mappings:
+        g2_contour_index, c1_to_c2_mapping = mappings[g1_contour_index]
+        current_mapped_contours_color = custom_colors.mix_color(start_color, end_color, g1_contour_index / total_mappings)
+        if g1_contour_index == total_mappings - 1:
+            current_mapped_contours_color = end_color
 
-        start_color = custom_colors.NEON_BLUE
-        end_color = custom_colors.NEON_RED
-        total_mappings = len(mappings)
-        # iterate through each contour of G1 and show the curve that it's mapped to in G2
-        for g1_contour_index in mappings:
-            g2_contour_index, c1_to_c2_mapping = mappings[g1_contour_index]
-            current_mapped_contours_color = custom_colors.mix_color(start_color, end_color, g1_contour_index / total_mappings)
-            if g1_contour_index == total_mappings - 1:
-                current_mapped_contours_color = end_color
+        g1_contour = glyph1.contours[g1_contour_index]
+        g2_contour = glyph2.contours[g2_contour_index]
 
-            g1_contour = glyph1.contours[g1_contour_index]
-            g2_contour = glyph2.contours[g2_contour_index]
+        # take each pair in the mapping; if it's not a null, draw a line
+        for pair in c1_to_c2_mapping.items():
+            c1_index, c2_index = pair
+            if c2_index is not None:
+                c1_curve_center = g1_contour.curves[c1_index].get_center_camera()
+                c2_curve_center = g2_contour.curves[c2_index].get_center_camera()
+                pygame.draw.line(surface, current_mapped_contours_color, c1_curve_center, c2_curve_center)
 
-            # take each pair in the mapping; if it's not a null, draw a line
-            for pair in c1_to_c2_mapping.items():
-                c1_index, c2_index = pair
-                if c2_index is not None:
-                    c1_curve_center = g1_contour.curves[c1_index].get_center_camera()
-                    c2_curve_center = g2_contour.curves[c2_index].get_center_camera()
-                    pygame.draw.line(surface, current_mapped_contours_color, c1_curve_center, c2_curve_center)
+            # draw over the current contour outline with this color
+            g1_contour.draw(surface, globvar.POINT_DRAW_RADIUS, [current_mapped_contours_color]*3)
+            g2_contour.draw(surface, globvar.POINT_DRAW_RADIUS, [current_mapped_contours_color]*3)
 
-                # draw over the current contour outline with this color
-                g1_contour.draw(surface, globvar.POINT_DRAW_RADIUS, [current_mapped_contours_color]*3)
-                g2_contour.draw(surface, globvar.POINT_DRAW_RADIUS, [current_mapped_contours_color]*3)
-
+"""
+Takes in a string and sets the mapping and interpolation methods accordingly.
+"""
 def set_mapping_and_lerping_methods(string):
     if string == "Pillow Projection":
         globvar.current_glyph_mapping_method = contour.find_pillow_projection_mapping
@@ -224,9 +200,8 @@ def lerp_active_glyphs(t):
                                              globvar.current_glyph_lerping_method,
                                              globvar.current_glyph_mapping, t)
     globvar.lerped_glyph.worldspace_offset_by(-globvar.lerped_glyph.get_upper_left_world())
-    globvar.lerped_glyph.update_bounds()
-    globvar.lerped_glyph.update_all_curve_points()
-    globvar.lerped_glyph.reset_draw_surface()
+    globvar.lerped_glyph.update_all_parameters()
+
     return
 
 def go_into_point_manipulation_mode():
@@ -287,7 +262,7 @@ def calculate_t_array():
 
 
 def get_glyphs_from_text(text, font1, font2, wrap_x=None):
-    string_length = len(text)
+    lines = text.splitlines()
 
     # first find how many mappings we need; one for each character present in the text
     characters_in_text = custom_math.unique_string_values(text)
@@ -309,7 +284,14 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
         char_mapping, score = glyph.find_glyph_contour_mapping(g1, g2, globvar.current_glyph_mapping_method)
         character_mappings[char] = (g1, g2, char_mapping)
 
+
+    # Begin building characters
+
+    string_length = sum(len(line) for line in lines)  # note that this includes spaces, so the lerping has
+    # higher visual correlation with distance along the line
+
     between_character_buffer = 1
+    current_character_count = 0
     current_draw_x = 0
     current_draw_y = 0
     starting_line = True
@@ -317,37 +299,44 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
 
     # now we have all of the mappings we need - let's generate the text one character at a time
     globvar.debug_width_points = []
-    for i, char in enumerate(text):
-        globvar.debug_width_points.append([current_draw_x,
-                                           current_draw_y])
-        t = i / string_length
-        if char == ' ':
-            if not starting_line:
-                current_draw_x += widest_glyph_width * globvar.EM_TO_FONT_SCALE
-        else:
-            starting_line = False
+    for line in lines:
+        for char in line:
+            globvar.debug_width_points.append([current_draw_x, current_draw_y])
+            t = current_character_count / string_length
+            if char == ' ':
+                if not starting_line:
+                    current_draw_x += widest_glyph_width * globvar.EM_TO_FONT_SCALE
+            else:
+                starting_line = False
 
-            # get mapping info
-            g1, g2, char_mapping = character_mappings[char]
-            globvar.cur_character_lerped = char                     # TODO DEBUG INFORMATION, CAN GET RID OF
+                # get mapping info
+                g1, g2, char_mapping = character_mappings[char]
+                globvar.cur_character_lerped = char                     # TODO DEBUG INFORMATION, CAN GET RID OF
 
-            # generate the correct tween-glyph and move the draw_x accordingly
-            lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_lerping_method, char_mapping, t)
-            lerped_glyph.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
-            lerped_glyph.update_bounds()
+                # generate the correct tween-glyph and move the draw_x accordingly
+                lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_lerping_method, char_mapping, t)
+                lerped_glyph.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+                lerped_glyph.update_bounds()
 
-            # make its left side aligned with (0, 0) and then push as needed
-            offset = np.array([current_draw_x, current_draw_y]) - lerped_glyph.get_upper_left_world()
-            lerped_glyph.worldspace_offset_by(offset)
-            lerped_glyph.update_bounds()
+                # make its left side aligned with (0, 0) and then push as needed
+                offset = np.array([current_draw_x, current_draw_y]) - lerped_glyph.get_upper_left_world()
+                lerped_glyph.worldspace_offset_by(offset)
+                lerped_glyph.update_bounds()
 
-            lerped_glyphs.append(lerped_glyph)
-            current_draw_x += lerped_glyph.width + between_character_buffer
+                lerped_glyphs.append(lerped_glyph)
+                current_draw_x += lerped_glyph.width + between_character_buffer
 
-        if wrap_x is not None and current_draw_x >= wrap_x:
-            current_draw_x = 0
-            current_draw_y += tallest_glyph_height * globvar.EM_TO_FONT_SCALE
-            starting_line = True
+            if wrap_x is not None and current_draw_x >= wrap_x:
+                current_draw_x = 0
+                current_draw_y += tallest_glyph_height * globvar.EM_TO_FONT_SCALE
+                starting_line = True
+
+            current_character_count += 1
+
+        # end line loop by resetting current horizontal position
+        current_draw_x = 0
+        current_draw_y += tallest_glyph_height * globvar.EM_TO_FONT_SCALE
+        starting_line = True
 
 
     return lerped_glyphs

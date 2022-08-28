@@ -8,9 +8,7 @@ import custom_math
 import custom_colors
 import contour
 import itertools
-import time
 
-import ptext
 
 
 class Glyph(object):
@@ -32,11 +30,26 @@ class Glyph(object):
         self.draw_surface_is_updated = False
         return
 
+    """
+    "Length" or "size" of a Glyph is defined to be the number of Contours
+    """
+    def __len__(self):
+        return len(self.contours)
+
+
+    """
+    Returns a deep copy of this Glyph object and adds the copy to the global running list of Glyphs
+    """
     def copy(self):
         clone = copy.deepcopy(self)
         globvar.glyphs.append(clone)
         return clone
 
+
+    """
+    For when a Glyph and its Contours should be garbage collected (e.g. when we remix the continuously lerped glyph).
+    Destroys Contour objects and removes this Glyph from the global list.
+    """
     def destroy(self):
         for c in self.contours:
             c.destroy()
@@ -44,46 +57,85 @@ class Glyph(object):
         globvar.glyphs.pop(index)
         return
 
-    def __len__(self):
-        return len(self.contours)
-
+    """
+    Adds a contour to this glyph's list of contours
+    """
     def append_contour(self, contour):
         contour.character_code = self.character_code
         self.contours.append(contour)
         return
 
+    """
+    Adds each contour from a given list to this glyph's list of contours
+    """
     def append_contours_multi(self, contours):
         for contour in contours:
             self.append_contour(contour)
         return
 
+    """
+    Returns whether all of the contours comprising the glyph are closed paths (cycles)
+    """
     def check_all_contours_closed(self):
         for c in self.contours:
             if not c.is_closed(): return False
         return True
 
+    @DeprecationWarning
     def prune_curves(self):
         for c in self.contours:
             c.prune_curves()
         return
 
+    """
+    Updates every value pertaining to maintaining proper drawing and bounds.
+    Does the same for contours and curves comprising it if those values depend directly upon being part of this glyph
+    (e.g. the relative upper-left corner of the glyph for the curves)
+    """
+    def update_all_parameters(self):
+        self.sort_contours_by_fill()
 
+        self.update_bounds()
+        self.update_curves_upper_left()
+        self.reset_draw_surface()
+
+        self.update_all_curve_points()
+
+        return
+
+    """
+    Offsets the worldspace (real) points of the curves of each Contour in this Glyph by offset
+    """
     def worldspace_offset_by(self, offset):
         for contour in self.contours:
             contour.worldspace_offset_by(offset)
 
+    """
+    Scales the worldspace (real) points of the curves of each Contour in this Glyph by scale
+    """
     def worldspace_scale_by(self, scale):
         for contour in self.contours:
             contour.worldspace_scale_by(scale)
         self.draw_surface_is_updated = False
         return
 
+    """
+    Sorts this Glyph's contours by their fill type so that they can be drawn in the correct order later.
+    """
     def sort_contours_by_fill(self):
+        for contour in self.contours:
+            contour.determine_fill_direction()
+
         direction_dictionary = {contour: contour.fill for contour in self.contours}
         direction_dictionary = custom_math.sort_dictionary(direction_dictionary, 1, reverse=True)
         self.contours = [contour for contour in direction_dictionary.keys()]
         return
 
+
+    """
+    Updates this Glyph object's bounding box information based on those of its contours. Also invokes each contour's 
+    bounding box update function.
+    """
     def update_bounds(self):
         min_left = math.inf
         min_up = math.inf
@@ -104,21 +156,35 @@ class Glyph(object):
         self.width = self.lower_right_world[0] - self.upper_left_world[0]
         self.height = self.lower_right_world[1] - self.upper_left_world[1]
 
+        return
+
+    """
+    Updates what this glyph's upper left corner is for the curves so they can correctly draw later
+    """
+    def update_curves_upper_left(self):
         for contour in self.contours:
             for curve in contour.curves:
                 curve.parent_glyph_upper_left = self.get_upper_left_camera()
 
         return
 
-    def reset_draw_surface(self):
-        self.draw_surface_is_updated = False
-        return
-
+    """
+    For all Curves comprising the Contours of this Glyph, refreshes any 
+    abstract points based on the base worldspace points of 
+    """
     def update_all_curve_points(self):
         for contour in self.contours:
             for curve in contour.curves:
                 curve.update_points()
         return
+
+    """
+    Resets this Glyph's "updatedness" so that it will redraw itself next time draw is invoked.
+    """
+    def reset_draw_surface(self):
+        self.draw_surface_is_updated = False
+        return
+
 
     def get_upper_left_world(self):
         return self.upper_left_world
@@ -139,14 +205,10 @@ class Glyph(object):
         return pygame.Rect(self.get_upper_left_camera(),
                            (self.width * globvar.CAMERA_ZOOM, self.height * globvar.CAMERA_ZOOM))
 
-    def get_center_camera(self):
-        return custom_math.world_to_cameraspace(self.get_center_world())
-        # upper_left = self.get_upper_left_world()
-        # world_dimensions = np.array([self.width, self.height])
-        # return upper_left + (world_dimensions/2)
 
     """
-    The center is defined to be the average of the predetermined number of points which are plotted along the curves
+    The center is defined to be the average of the predetermined number of points which are plotted along the contours
+    comprising a glyph
     """
     def get_center_world(self):
 
@@ -233,30 +295,30 @@ class Glyph(object):
         # camera_dimensions = np.array([self.width, self.height]) * globvar.CAMERA_ZOOM
         # return upper_left + (camera_dimensions/2)
 
+    """
+    Returns the Glyph object's center in cameraspace
+    """
+    def get_center_camera(self):
+        return custom_math.world_to_cameraspace(self.get_center_world())
+
+
     def draw(self, surface, radius, width=1, color=None):
         # drawing a glyph is expensive; let's draw it once everytime the user zooms
         # when the user pans, we can just draw where we draw the glyph's *surface*
         # see the Glyph class' "worldspace_scale_by". It's there that we let the surface be None
 
-        # TODO Could use another case; needs to be filled since the bounding box didn't change but the shape did (i.e. moving points)
+        # TODO Could use another case:
+        #  when the points change but the bounding box doesn't, there's no need to reallocate space
+        #  for a draw_surface; instead, we could just fill and draw over the current one
         if not self.draw_surface_is_updated:
             self.draw_surface_is_updated = True
-            print("Updated draw surface of ", self)
+            print("Updated draw surface of", self)
 
             bounding_box = self.get_bounding_box_camera()
             self.draw_surface = pygame.Surface((round(bounding_box.width) + globvar.LINE_THICKNESS,
                                                 round(bounding_box.height) + globvar.LINE_THICKNESS),
                                                pygame.SRCALPHA, 32)
             self.draw_surface = self.draw_surface.convert_alpha()
-
-
-            # define a surface on which the contours can draw their fills
-            # bounding_box = self.get_bounding_box_camera()
-            # factor = 0.2
-            # glyph_surface = pygame.Surface(globvar.SCREEN_DIMENSIONS*(1+factor))
-            # glyph_surface = pygame.Surface((bounding_box.width * (1+factor), bounding_box.height * (1+factor)))
-            # glyph_surface.fill(custom_colors.WHITE)
-
 
             # first let them draw their respective fills
             gray_value = 0.85 * 255
@@ -268,33 +330,15 @@ class Glyph(object):
             for cont in self.contours:
                 cont.draw(self.draw_surface, radius, color=color, width=width)
 
-                # if True:
-                #     pnts = contour.get_points_along_from_fractions([0, 0.1, 0.5, 0.8, 0.95])
-                #     num_pnts = len(pnts)
-                #     for i, coords in enumerate(pnts):
-                #         camera_coords = custom_math.world_to_cameraspace(coords)
-                #         camera_coords = (camera_coords[0], camera_coords[1])
-                #
-                #         # tsurf, tpos = ptext.draw(str(adj_index), color=(0, 0, 0), center=camera_coords)
-                #         # globvar.screen.blit(tsurf, tpos)
-                #         col = round(255 * i / num_pnts)
-                #         pygame.draw.circle(surface, (0, col, col), camera_coords, 4)
 
-                #
-                #     # if i == round(time.time()) % len(contour):
-                #     #
-                #     #     break
-
-
-            if True or globvar.show_extra_curve_information:
-                print("SHOWING GLYPH DEBUG INFO")
+            if globvar.show_extra_curve_information:
                 pygame.draw.circle(self.draw_surface, custom_colors.GREEN, self.get_upper_left_camera(), radius)
                 # pygame.draw.circle(surface, custom_colors.GREEN, self.get_lower_right_camera(), radius)
                 # pygame.draw.circle(s, custom_colors.RED, self.get_center_camera(), radius)
         surface.blit(self.draw_surface, self.get_upper_left_camera())
 
 
-        if False:
+        if globvar.show_evenly_space_points:
             for cont in self.contours:
                 pnts_dict = cont.get_equally_spaced_points_along(globvar.POINTS_TO_GET_CONTOUR_MAPPING_WITH,
                                                                     return_relative_to_upper_left_curve=True)
@@ -319,8 +363,7 @@ class Glyph(object):
                 cont.draw_control_points(surface)
         return
 
-def calc_contour_score_MSE(contour1, contour2):
-    return contour.find_ofer_min_mapping(contour1, contour2)
+
 
     # if len(curve1.tween_points) != len(curve2.tween_points):
     #     raise ValueError("Tried to calculate score of curves with different numbers of points")
@@ -337,6 +380,7 @@ and is of the same fill type (clockwise or CCW).
 That contour will begin as a copy in G2 and become what it is in G1.
 That inherently gives it a mapping.
 """
+# TODO: implement same fill type preference in contour mapping or allow with some option for them to vanish
 def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_info=False):
     # ensure that glyph1 has no less contours than glyph2
     n1 = len(glyph1)
@@ -373,7 +417,6 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
     glyph1.update_bounds()
     glyph2.update_bounds()
 
-    # TODO implement clockwise/CCW preference in contour mapping (currently just never picks those I think)
     # pick a mapping of glyph2's contours to glyph1's (any to any)
     g1_subsets = itertools.combinations(range(n1), n2)      # pick any n2-size subset of g1's contours
     g2_permutations = itertools.permutations(range(n2))     # try all permutations of g2's contours
@@ -393,7 +436,9 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
                 g1_contour = glyph1.contours[g1_c]
                 g2_contour = glyph2.contours[g2_c]
 
-                mapping, score = contour_mapping_function(g1_contour, g2_contour)
+                mapping, score = contour.contour_mapping_preprocess(g1_contour,
+                                                                    g2_contour,
+                                                                    contour_mapping_function)
                 current_mapping_set_score += score
                 # recall that we give this from g1's perspective, so a mapping pair for this 'c1' is
                 # a corresponding g2 contour 'c2' and the mapping between them
@@ -420,7 +465,10 @@ def find_glyph_contour_mapping(glyph1, glyph2, contour_mapping_function, debug_i
         found_one_at_all = False
         for c2_index, contour2 in enumerate(glyph2.contours):
             # reminder: returns the best mapping of curves and score of that mapping
-            mapping, mapping_score = contour_mapping_function(contour1, contour2)
+            mapping, mapping_score = contour.contour_mapping_preprocess(g1_contour,
+                                                                        g2_contour,
+                                                                        contour_mapping_function)
+
             if mapping_score > current_best_score or not found_one_at_all:
                 current_best_mapping = mapping
                 current_best_score = mapping_score
@@ -450,6 +498,7 @@ def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_inf
         temp = glyph1
         glyph1 = glyph2
         glyph2 = temp
+        t = 1-t
 
     lerped_glpyh = Glyph(glyph1.character_code)
     n1 = len(glyph1)
@@ -473,7 +522,11 @@ def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_inf
         # print("current details:", g1_mapping_details)
         g1_contour = glyph1.contours[g1_contour_index]
         g2_contour = glyph2.contours[g2_contour_index]
-        lerped_contour = contour_lerping_function(g1_contour, g2_contour, g2_contour_mapping, t)
+        lerped_contour = contour.contour_lerping_preprocess(g1_contour,
+                                                            g2_contour,
+                                                            g2_contour_mapping,
+                                                            t,
+                                                            contour_lerping_function)
 
         # TODO set contour fill type correctly
         #  for now, it'll just be its original type (should still be that way later...? I think? Since
@@ -489,8 +542,10 @@ def lerp_glyphs(glyph1, glyph2, contour_lerping_function, mappings, t, debug_inf
     glyph2.update_bounds()
 
     lerped_glpyh.update_bounds()
-    print("lerped glyph:", glyph1.character_code, "has", len(lerped_glpyh), "contours")
+
+    # print("lerped glyph:", glyph1.character_code, "has", len(lerped_glpyh), "contours")
     return lerped_glpyh
+
 
 def glyph_from_curves(curves):
     cont = contour.Contour()

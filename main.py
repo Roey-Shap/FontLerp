@@ -1,15 +1,7 @@
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
-
-import itertools
 import sys
 import time
 import numpy as np
 import custom_math
-import copy
 
 import custom_pygame
 import global_variables as globvar
@@ -19,10 +11,7 @@ import fonts
 import custom_colors as colors
 import global_manager
 
-
 import pygame
-import contour
-import glyph
 
 print("NOTE: THERE'S STILL A LINGERING QUESTION OF HOW TO MAP CONTOURS OF DIFFERENT FILL TYPES. PLAY"
       "AROUND WITH SOME TEXT TO SEE WHAT I MEAN. THERE'S PROBABLY A SIMPLE SOLUTION BUT I DON'T"
@@ -54,44 +43,46 @@ test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf",
               "Lora-Regular.ttf", "Alef-Regular.ttf", "Lora-Italic.ttf", "Alef-Bold.ttf"]
 
 
-test_text = "Yeah! It is good enough for now!"
+test_text = "What does a skeleton \n tile his roof \n with? ... SHINgles!!!"
+
 font1 = test_fonts[4]
 font1_bold = test_fonts[6]
 font2 = test_fonts[3]
 font2_italic = test_fonts[5]
+font_sans = "comic_sans.ttf"
+font_papyrus = "PAPYRUS.ttf"
 font_cursive = "Calligraffiti.ttf"
 
 
 test_lerped_glyphs = None
-test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text, font1, font2,
-                                                         wrap_x=w)
+# test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text,
+#                                                          font_sans,
+#                                                          font_papyrus,
+#                                                          wrap_x=w * 1.5)
 
 
 drawing_full_text_mode = test_lerped_glyphs is not None
 
-test_o = ttfConverter.glyph_from_font("q", font2)
-test_o.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
-test_o.update_bounds()
-up_left_origin_diff = test_o.get_upper_left_world()
-test_o.worldspace_offset_by(-up_left_origin_diff)
-test_o.update_bounds()
-
-test_glyphs = []
+# test_o = ttfConverter.glyph_from_font("q", font2)
+# test_o.worldspace_scale_by(globvar.EM_TO_FONT_SCALE)
+# test_o.update_bounds()
+# up_left_origin_diff = test_o.get_upper_left_world()
+# test_o.worldspace_offset_by(-up_left_origin_diff)
+# test_o.update_bounds()
+#
+# test_glyphs = []
 
 
 active_letter_initial_scale = 1
-character = "o"
-test_h = ttfConverter.glyph_from_font(character, font1)
-test_i = ttfConverter.glyph_from_font(character, font_cursive)
+character = "g"
+g1_import = ttfConverter.glyph_from_font(character, font1)
+g2_import = ttfConverter.glyph_from_font(character, font2)
 
-test_h.worldspace_scale_by(0.1 * active_letter_initial_scale)
-test_i.worldspace_scale_by(0.15 * active_letter_initial_scale)
-
-
+g1_import.worldspace_scale_by(0.1 * active_letter_initial_scale)
+g2_import.worldspace_scale_by(0.15 * active_letter_initial_scale)
 
 
-
-global_manager.set_active_glyphs(test_h, test_i)
+global_manager.set_active_glyphs(g1_import, g2_import)
 
 # CIRCLE
 # circle = contour.get_unit_circle_contour()
@@ -123,6 +114,17 @@ global_manager.set_active_glyphs(test_h, test_i)
 # global_manager.set_active_glyphs(g_hex, g_tri)
 
 
+test_points = np.array([[0, 0],
+                        [2, 4],
+                        [0, 8],
+                        [11, -4],
+                        [15, -6]])
+test_points *= 5
+
+
+
+# globvar.test_curves.append()
+
 
 # Start execution ============================
 mixed_glyph = None
@@ -138,11 +140,11 @@ g2.worldspace_offset_by(np.array([w*2/4, h/2]))
 # Do one step to update offsets and such
 for g in globvar.glyphs:
     g.update_bounds()
+    g.update_curves_upper_left()
     g.update_all_curve_points()
     g.reset_draw_surface()
 
 scrolling = False
-
 # Execution loop
 running = True
 while running:
@@ -163,7 +165,7 @@ while running:
                 globvar.KEY_SPACE_PRESSED = True
                 # globvar.DEBUG = not globvar.DEBUG
             if event.key == pygame.K_r:
-                print("Mapping disabled. Come uncomment this if you want a mapping.")
+                raise ValueError("Mapping disabled. Come uncomment this if you want a mapping.")
                 # mappings, glyph_score = glyph.find_glyph_null_contour_mapping(test_h, test_i, debug_info=True)
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_SPACE:
@@ -171,7 +173,7 @@ while running:
         elif event.type == pygame.MOUSEWHEEL:
             globvar.mouse_scroll_directions = np.array([event.x, event.y])
 
-# Get Inputs
+# ==== Get Inputs ====
 
     # get mouse position relative to upper-left-hand corner
     mouse_pos = pygame.mouse.get_pos()
@@ -199,11 +201,11 @@ while running:
         if globvar.BEZIER_ACCURACY != prev_accuracy:
             global_manager.calculate_t_array()
 
-    # update Bezier curves in response to any points which changed
 
     for g in globvar.glyphs:
         glyph_changed = False
-        g.update_bounds()
+        g.update_curves_upper_left()
+        # g.update_bounds()
 
         for cont in g.contours:
             for curve in cont.curves:
@@ -214,6 +216,7 @@ while running:
                 # update the curves based on the cursor's panning and offsetting
                 if just_stopped_scrolling or panned_camera:     # TODO <<<< some redudancy here; caching the image means we don't need to update the cameraspace points when panning, really...
                     curve.update_points()
+                    # print("OH MAN")
 
         if scrolling or glyph_changed:
             print("GLYPH CHANGED ~LINE 196", g)
@@ -221,6 +224,8 @@ while running:
 
 
 
+
+    # for testing worldspace/cameraspace, keep track of a rectangle in space to see how it moves
     glyph_box_offset_corner = globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT - globvar.CAMERA_OFFSET
     glyph_box = pygame.Rect(glyph_box_offset_corner * globvar.CAMERA_ZOOM,
                             globvar.DEFAULT_BOUNDING_BOX_UNIT_DIMENSIONS * globvar.CAMERA_ZOOM)
@@ -228,10 +233,8 @@ while running:
 
     # Reset the mixed contour on display
     if globvar.lerped_glyph is not None:
-        print("Destroying previous lerped_glyph")
         globvar.lerped_glyph.destroy()
         globvar.lerped_glyph = None
-
 
 
     # Remix the glyph
@@ -255,61 +258,50 @@ while running:
             active_glyph.update_all_curve_points()      # TODO in theory can be limited to just when scrolling happens
             active_glyph.draw(screen, point_radius)
 
-    # test_h.draw(screen, point_radius)
-    # test_i.draw(screen, point_radius)
 
-    for i, l in enumerate(globvar.marking_test_points_lists):
-        active_glyph_offset = globvar.active_glyphs[1-i].get_upper_left_camera()
-        num_points = len(l)
-        for p_i, p in enumerate(l):
-            if p_i % 1 == 0:
-                p = custom_math.world_to_cameraspace(p) + active_glyph_offset
-                # pygame.draw.circle(screen, (0, 0, 0), custom_math.world_to_cameraspace(p) + active_glyph_offset, (p_i+1) * 5/num_points)
-                centered_pos = (p[0], p[1])
-                tsurf, tpos = ptext.draw(str(p_i), color=(0, 0, 0), center=centered_pos)
-                screen.blit(tsurf, tpos)
+    # Some leftover DEBUG code
+    # for i, l in enumerate(globvar.marking_test_points_lists):
+    #     active_glyph_offset = globvar.active_glyphs[1-i].get_upper_left_camera()
+    #     num_points = len(l)
+    #     for p_i, p in enumerate(l):
+    #         if p_i % 1 == 0:
+    #             p = custom_math.world_to_cameraspace(p) + active_glyph_offset
+    #             # pygame.draw.circle(screen, (0, 0, 0), custom_math.world_to_cameraspace(p) + active_glyph_offset, (p_i+1) * 5/num_points)
+    #             centered_pos = (p[0], p[1])
+    #             tsurf, tpos = ptext.draw(str(p_i), color=(0, 0, 0), center=centered_pos)
+    #             screen.blit(tsurf, tpos)
 
-    for i, pnt in enumerate(globvar.random_debug_points):
-        active_glyph_offset = globvar.active_glyphs[1-i].get_upper_left_camera()
-        pygame.draw.circle(screen, (0, 255, 0), custom_math.world_to_cameraspace(pnt) + active_glyph_offset, 5)
+    # for i, pnt in enumerate(globvar.random_debug_points):
+    #     active_glyph_offset = globvar.active_glyphs[1-i].get_upper_left_camera()
+    #     pygame.draw.circle(screen, (0, 255, 0), custom_math.world_to_cameraspace(pnt) + active_glyph_offset, 5)
+
 
     if test_lerped_glyphs is not None and globvar.show_lerped_glyph_text:
         global_manager.draw_lerped_text(screen, test_lerped_glyphs)
 
-    # for debug_point in globvar.debug_width_points:
-    #     pygame.draw.circle(screen, colors.BLUE, custom_math.world_to_cameraspace(np.array(debug_point)), 5)
-
-    # tri.draw_filled_polygon(screen, globvar.POINT_DRAW_RADIUS)
-
     if globvar.show_current_glyph_mapping:
         manager.draw_mapping_pillow_projection(screen, mappings)
+
 
     for test_curve in globvar.test_curves:
         test_curve.draw(screen, point_radius)
 
-    # test_o.draw(screen, globvar.POINT_DRAW_RADIUS)
 
-
-
+    # GUI drawing
     if globvar.update_screen:
-        # GUI drawing
         cursor.draw(screen)
         toolbar.draw(screen)
 
     # Debug drawing
-    if globvar.update_screen and globvar.DEBUG:
-        # origin_coords = custom_math.world_to_cameraspace(globvar.SCREEN_DIMENSIONS)
-        # pygame.draw.circle(screen, colors.BLACK, origin_coords, 5)
-        # if globvar.DEBUG:
-        #     tsurf, tpos = ptext.draw((origin_coords[0], origin_coords[1]), color=colors.BLACK)
-        #     screen.blit(tsurf, tpos)
+    if globvar.DEBUG:
         origin_coords = custom_pygame.np_to_ptext_coords(custom_math.world_to_cameraspace(origin))
         pygame.draw.circle(screen, colors.BLACK, origin_coords, 5)
-        if globvar.DEBUG:
-            tsurf, tpos = ptext.draw(str((0, 0)), color=colors.BLACK,
-                                     left=origin_coords[0] + globvar.POINT_DRAW_RADIUS,
-                                     top=origin_coords[1] + globvar.POINT_DRAW_RADIUS)
-            screen.blit(tsurf, tpos)
+
+        tsurf, tpos = ptext.draw(str((0, 0)), color=colors.BLACK,
+                                 left=origin_coords[0] + globvar.POINT_DRAW_RADIUS,
+                                 top=origin_coords[1] + globvar.POINT_DRAW_RADIUS)
+        screen.blit(tsurf, tpos)
+
 
         debug_messages = ["Camera Offset: " + str(np.round(globvar.CAMERA_OFFSET, 4)),
                           "Global scale: " + str(round(globvar.CAMERA_ZOOM, 4)),
@@ -320,6 +312,7 @@ while running:
                           "Global Manager State: " + str(manager.state)]
                           # "All Mappings: " + str(globvar.glyph_mappings)]
                           # "Glyph Mapping: " + str(globvar.current_glyph_mapping)]
+
         for i, message in enumerate(debug_messages):
             text_rect = pygame.Rect(0, 0, w/4, h)
             debug_text_surface = fonts.multiLineSurface(message, fonts.FONT_DEBUG, text_rect, colors.BLACK)
@@ -327,10 +320,7 @@ while running:
             screen.blit(debug_text_surface, (20, (i+1) * 20))
 
 
-    if globvar.update_screen:
-        pygame.display.flip()
-
-    # globvar.update_screen = False
+    pygame.display.flip()
 
 
 

@@ -78,6 +78,7 @@ def convert_quadratic_flagged_points_to_contour(flagged_points):
             current_points = [current_coords]                           # reset the list for the next curve
 
     cont.update_bounds()
+    cont.determine_fill_direction()
     return cont
 
 def glyph_from_font(char, font_file_name):
@@ -90,6 +91,5 @@ def glyph_from_font(char, font_file_name):
         #     print(char, font_file_name)
         g.append_contour(formatted_contour)
 
-    g.sort_contours_by_fill()
-    g.update_bounds()
+    g.update_all_parameters()
     return g
