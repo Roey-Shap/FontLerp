@@ -1,5 +1,7 @@
 import numpy as np
 import pygame
+
+import contour
 import custom_colors
 import global_variables as globvar
 import global_manager

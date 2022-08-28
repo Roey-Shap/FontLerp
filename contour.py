@@ -38,6 +38,13 @@ class Contour(object):
         globvar.contours.append(self)
         return
 
+    def __len__(self):
+        return len(self.curves)
+
+    """
+    For when a Contour and its curves should be garbage collected.
+    Destroys curve objects and removes this Contour from the global list.
+    """
     def destroy(self):
         for curve in self.curves:
             curve.destroy()
@@ -45,45 +52,56 @@ class Contour(object):
         globvar.contours.pop(index)
         return
 
+    """
+    Returns a deep copy of the Contour and manually adds it to the global contour list
+    """
     def copy(self):
         clone = copy.deepcopy(self)
         globvar.contours.append(clone)
         return clone
 
+    """
+    Offsets the worldspace (real) points of each curve in this Contour by offset
+    """
     def worldspace_offset_by(self, offset):
         for curve in self.curves:
             curve.worldspace_offset_by(offset)
         return
 
+    """
+    Scales the worldspace (real) points of each curve in this Contour by scale
+    """
     def worldspace_scale_by(self, scale):
         for curve in self.curves:
             curve.worldspace_scale_by(scale)
         return
 
+    """
+    Adds curve to this Contour's list of curves
+    """
     def append_curve(self, curve):
         self.curves.append(curve)
         self.num_points += curve.tween_points.shape[0]          # for finding the average later
         return
 
+    """
+    Adds multiple curves to this Contour's list of curves
+    """
     def append_curve_multi(self, curves):
         for curve in curves:
             self.append_curve(curve)
         return
 
+    """
+    Adds multiple curves to this Contour's list of curves directly from a lsit of numpy arrays
+    """
     def append_curves_from_np(self, curves_point_data):
         for curve_data in curves_point_data:
             self.append_curve(curve.Bezier(curve_data))
         return
 
 
-    def update_bounds(self):
-        left = min(c.get_upper_left_world()[0] for c in self.curves)
-        top = min(c.get_upper_left_world()[1] for c in self.curves)
-        right = max(c.get_lower_right_world()[0] for c in self.curves)
-        bottom = max(c.get_lower_right_world()[1] for c in self.curves)
-        self.upper_left_world = np.array([left, top], dtype=globvar.POINT_NP_DTYPE)
-        self.lower_right_world = np.array([right, bottom], dtype=globvar.POINT_NP_DTYPE)
-
+    def determine_fill_direction(self):
         curve_end_points = []
         num_curves = len(self)
         for i in range(num_curves):
@@ -93,13 +111,32 @@ class Contour(object):
 
         points_direction = custom_math.points_clock_direction(curve_end_points)
         self.fill = FILL.ADD if points_direction == 1 else FILL.SUBTRACT
+
         return
 
+    """
+    Update the upper-left and lower-right (the bounding box-defining points) of this Contour
+    given its curve information.
+    """
+    def update_bounds(self):
+        left = min(c.get_upper_left_world()[0] for c in self.curves)
+        top = min(c.get_upper_left_world()[1] for c in self.curves)
+        right = max(c.get_lower_right_world()[0] for c in self.curves)
+        bottom = max(c.get_lower_right_world()[1] for c in self.curves)
+        self.upper_left_world = np.array([left, top], dtype=globvar.POINT_NP_DTYPE)
+        self.lower_right_world = np.array([right, bottom], dtype=globvar.POINT_NP_DTYPE)
+
+        return
+
+    """
+    Returns the worldspace points of each of this Contour's curves in a nicer format.
+    """
     def get_str_worldspace_points(self):
         string = ""
         for curve in self.curves:
             string += str(np.round(curve.worldspace_points, 3)) + "\n"
         return string
+
 
     def get_upper_left_world(self):
         return self.upper_left_world
@@ -128,10 +165,12 @@ class Contour(object):
                 return False
         return True
 
+
     """
     Returns the number of curves this contour is over the curve threshold
     and removes the shortest such curves from the contour
     """
+    @DeprecationWarning
     def prune_curves(self):
         raise ValueError("THIS FUNCTION ISN'T COMPLETE! It still needs a way of reconstructing the curve from those"
                          "most crucial curves it found it wanted to keep")
@@ -171,28 +210,14 @@ class Contour(object):
         return globvar.CONTOUR_CURVE_AMOUNT_THRESHOLD - len(self)
 
 
+    """
+    Returns the worldspace (real) length of the entire contour
+    """
     def get_length_worldspace(self):
         return sum(c.get_length_world() for c in self.curves)
 
 
-    # TODO
-    def remove_curve(self, curve):
-        return
-
-
-    # TODO
-    def pop_last_curve(self):
-        return
-
-    def __len__(self):
-        return len(self.curves)
-
-    def get_center(self):
-        position_sum = 0
-        for curve in self.curves:
-            position_sum += np.sum(curve.tween_points, axis=0)
-        return position_sum / self.num_points
-
+    @DeprecationWarning
     def update_curve_center_relative_angles(self):
         center = self.get_center()
         for curve in self.curves:
@@ -203,6 +228,7 @@ class Contour(object):
             curve.current_contour_relative_angle = cur_curve_rel_angle
             # print("rel angle:", cur_curve_rel_angle)
         return
+
 
     def get_anchor_world(self):
         top_left = self.get_upper_left_world()
@@ -220,13 +246,14 @@ class Contour(object):
         else:   # commas and stuff for now
             return down_right
 
+    """
+    Returns a list of num_points points spaced equally along the contour.
+    """
     def get_equally_spaced_points_along(self, num_points,
                                         return_relative_to_upper_left_curve=False):
 
         resultant_points = []
         curves_and_points = {index: [] for index in range(len(self))}
-        # if self.fill == FILL.ADD:
-        #     print(len(curves_and_points))
 
         contour_length_worldspace = self.get_length_worldspace()
 
@@ -444,7 +471,12 @@ class Contour(object):
 
         return result
 
-    # Drawing
+
+    # ==== Drawing ====
+
+    """
+    Draws the outline of this Contour onto the given surface with a given color.
+    """
     def draw(self, surface, radius, color=None, width=1):
         # draw curves in colors corresponding to their order in this contour
         no_input_color = color is None
@@ -456,26 +488,31 @@ class Contour(object):
             else:
                 final_color = [color, color, color]
             curve.draw(surface, radius, final_color, width=width)
-
-        # draw debug information (center, etc.)
-        if globvar.show_extra_curve_information:
-            a = 1
-            # center = self.get_center()
-            # debug_alpha = 0.3
-            # s = pygame.Surface((radius * 2, radius * 2))  # the size of your rect
-            # s.set_alpha(np.floor(debug_alpha * 255))  # alpha level
-            # s.fill(custom_colors.RED)
-            # surface.blit(s, center - radius)
-
-            pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius*0.75)
-            pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius*0.75)
         return
 
+    def draw_curve_bound_points(self, surface, radius):
+        # draw debug information (center, etc.)
+        if globvar.show_extra_curve_information:
+            pygame.draw.circle(surface, custom_colors.RED, self.get_upper_left_camera(), radius * 0.75)
+            pygame.draw.circle(surface, custom_colors.RED, self.get_lower_right_camera(), radius * 0.75)
+
+    """
+    Draws the control points defining each of this Contour's curve objects.
+    For annoying cutoff reasons, isn't included in a glyph's draw-caching and is instead drawn straight to the screen.
+    """
     def draw_control_points(self, surface):
         for curve in self.curves:
             curve.draw_control_points(globvar.screen, radius=globvar.POINT_DRAW_RADIUS)
         return
 
+    """
+    Draws a polygon in the space defined by the contour onto the specified surface.
+    flush_with_origin keeps the polygon flush with a parent glyph's bounding box and is used
+    when using draw-caching, wherein the glyph only redraws itself when changes are made.
+    Setting it to false could be useful if it's easier to draw the contour independently of its parent glyph.
+    
+    Won't throw an error if the contour isn't closed. 
+    """
     def draw_filled_polygon(self, surface, fill_color, width=1, flush_with_origin=True):
         # get all of the points of this contour's lines
         all_tween_points = []
@@ -497,6 +534,10 @@ class Contour(object):
         return contour_bounding_box
 
 
+"""
+An attempt at a more generic scoring function. Likely has logical errors...
+"""
+@DeprecationWarning
 def calc_score(curve1, curve2):
     # Attribute weights
     # length, angle between endpoints, angle from contour center
@@ -513,15 +554,26 @@ def calc_score(curve1, curve2):
     return score
 
 
+"""
+Given two curve objects, calculates their Mean-Squared Error.
+"""
+@DeprecationWarning
 def calc_curve_score_MSE(curve1, curve2):
     if len(curve1.tween_points) != len(curve2.tween_points):
         raise ValueError("Tried to calculate score of curves with different numbers of points")
+
     # Offset the given points so that they're centered
     c1_tween_points = custom_math.camera_to_worldspace(curve1.tween_points)
     c2_tween_points = custom_math.camera_to_worldspace(curve2.tween_points)
     return -(np.sum((c1_tween_points - c2_tween_points) ** 2) / len(c1_tween_points))
 
 
+"""
+A remnant of an attempt at using a greedy variant of the Reduction method.
+Does a weird sort of binary search to find the first operand of a choose function that will maximize without
+going over some threshold value.
+"""
+@DeprecationWarning
 def maximal_curves_for_threshold(n1, n2, threshold):
     # basically performs a binary search on the scale of the choose function
     prev_ncr = custom_math.ncr(n1, n2)
@@ -548,17 +600,62 @@ def maximal_curves_for_threshold(n1, n2, threshold):
 # Finding mappings =============================================
 
 """
-For C1 being the contour with at least as many curves as C2:
-1) find equally spaced points along each of the curves
-2) find the rotational offset that makes the points fit each other best (MSE)
-3) return the points for each and the mapping between them; also the MSE score found
+Performs basic checks on the contours that must occur regardless of mapping function.
 """
-def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
+def contour_mapping_preprocess(contour1: Contour, contour2: Contour, contour_mapping_function):
     if len(contour2) > len(contour1):
         temp = contour1
         contour1 = contour2
         contour2 = temp
 
+
+    if contour1.fill != contour2.fill:
+        print("Fills don't match! Beware of strange results!")
+
+    return contour_mapping_function(contour1, contour2)
+
+"""
+For two contours such that |C1| >= |C2|:
+Uses the "Reduction" method. Currently exhaustive, simply searching to find which subset of |C2| curves of C1
+will best fit C2's curves and ignores the rest.
+
+Returns a mapping where each pair is of the form (C1 curve, C2 curve) and a score - the higher the better.
+"""
+@DeprecationWarning
+def find_reduction_mapping(contour1: Contour, contour2: Contour):
+    n1 = len(contour1)
+    n2 = len(contour2)
+
+    index_subsets = itertools.combinations(range(n1), n2)  # returns all sets of indices in [0, n-1] of size n2
+    range_n2 = list(range(n2))
+
+    for indices in index_subsets:
+        # iterate through all offsets
+        for offset in range_n2:
+            # use the offset by iterating through all placements
+            # build a score for this mapping (based on both the indices and offset currently being tested)
+            current_mapping_score = 0
+            current_mapping_dict = {c1: None for c1 in range(n1)}
+            for c1_index, c2_index in zip(indices, range_n2):
+                c1_curve = contour1.curves[c1_index]
+                c2_curve = contour2.curves[(c2_index + offset) % n2]
+                current_mapping_score += calc_curve_score_MSE(c1_curve, c2_curve)
+                current_mapping_dict[c1_index] = (c2_index + offset) % n2
+            if current_mapping_score > best_score:
+                best_score = current_mapping_score
+                best_mapping = current_mapping_dict
+
+    return best_mapping, best_score
+
+
+"""
+Uses the "Pillow Projection" method.
+Projects a predetermined number of points onto each contour, uses an anchor point relative to each contour to determine
+which of those points should be that contour's "point 0". Matches points of the same index on each contour.
+
+Returns a mapping where each pair is of the form (point on C1, point on C2), and a score - the higher the better.
+"""
+def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
     n1 = len(contour1)
     n2 = len(contour2)
 
@@ -569,7 +666,9 @@ def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
     for contour in contours:
         equidis_points = contour.get_equally_spaced_points_along(num_sample_points)
 
-        anchor = contour.get_upper_left_world()         # TODO maybe change this to whichever anchor which minimizes MSE to each contour's center?
+        # @TODO Reassess: how best to pick anchor?
+        #   maybe change this to whichever anchor which minimizes MSE to each contour's center?
+        anchor = contour.get_upper_left_world()
 
         # find the point closest to the anchor
         closest_point = custom_math.find_point_closest_to_anchor(anchor, equidis_points, return_point_index=True)
@@ -590,15 +689,17 @@ def find_pillow_projection_mapping(contour1: Contour, contour2: Contour):
     for p1, p2 in mapping.values():
         score += np.sum((p1 - p2) ** 2)
 
-    score *= -1 / num_sample_points         # lower MSE is better
-
-    if contour1.fill != contour2.fill:
-        print("Fills don't match but were the only options! Beware of strange results!")
+    score *= -1 / num_sample_points         # lower MSE is better so we multiply by -1
 
     return mapping, score
 
 
+# @TODO Implemented hastily. Needs rewrite.
 """
+Finds a "Relative Projection" mapping. That is, we attempt to project the Bezier endpoints of each contour onto
+the other. This is done based on some relative anchor point to determine the fractional values of how far along
+the contour a given endpoint is. 
+
 Returns a mapping in the form of {{(contour1, contour2), rest_of_mapping_between_their_curves}}, score
 """
 def find_relative_projection_mapping(contour1: Contour, contour2: Contour):
@@ -835,20 +936,71 @@ def find_relative_projection_mapping(contour1: Contour, contour2: Contour):
     return mapping, score
 
 
-# Interpolation functions =============================================
+# ==== Interpolation functions ====
+def contour_lerping_preprocess(contour1: Contour, contour2: Contour, mapping: dict, t, lerping_function):
 
-"""
-Interpolates between two contours using the OferMin method:
-use the mapping given to determine which curves between the relevant indices
-given in the mapping should be mapped to "zero curves" in c2.
-"""
-
-def lerp_contours_pillow_proj(contour1, contour2, point_mapping, t):
     if len(contour2) > len(contour1):
         temp = contour1
         contour1 = contour2
         contour2 = temp
-        t = 1 - t
+        t = 1-t
+
+    return lerping_function(contour1, contour2, mapping, t)
+
+
+# @TODO Warning! Searches exhaustively! Prohibitively slow!
+@DeprecationWarning
+def lerp_contours_reduction(contour1: Contour, contour2: Contour, mapping: dict, t, debug_info=False):
+    # we know we need n1 curves in total
+    # we also know which indices of c1 were chosen
+    # therefore for any index not after the expected one (i.e. there is a gap between one index and the next)
+    # we fill with a "zero curve"
+    # mapping is a dictionary where each entry is of the form (c1, c2) and if that c1 curve has no mapping, (c1, None)
+    # make the same switch as the mapping did; from here, everything should be the same
+
+    n1 = len(contour1)
+    n2 = len(contour2)
+
+    lerped_contour = Contour()
+    # first find where we start building from
+
+    first_c1_index = None
+    first_c2_index = None
+    for pair in mapping.items():
+        first_c1_index, first_c2_index = pair
+        if first_c2_index is not None:
+            break
+
+    last_endpoint = contour2.curves[first_c2_index].worldspace_points[0]
+    for pair_index in range(n1):
+        # get the pair in the current cyclic index
+        c1_index = (pair_index + first_c1_index) % n1
+        c2_index = mapping[c1_index]
+        if debug_info:
+            print("adding curve #", c1_index, ", a mapping between C2's", c2_index, "and C1's",
+                  c1_index)
+        if c2_index is None:            # make a null curve
+            # interpolate between the current c1_curve and the "zero curve" which
+            # consists of four points bunched together at c2's last point
+            contour1_curve_true_points = contour1.curves[c1_index].worldspace_points
+            degree_polynomial = contour1_curve_true_points.shape[0]
+            lerped_zero_curve_points = custom_math.interpolate_np(
+                contour1_curve_true_points,
+                np.array([last_endpoint] * degree_polynomial),
+                t)
+            lerped_contour.append_curve(curve.Bezier(lerped_zero_curve_points))
+        else:                           # make a curve interpolated between the c1_index and c2_index curves
+            # now add the curve you've been trying to give me (we're all caught up to the expected index)
+            # by interpolating between the current c2 curve and the corresponding c1 curve
+            lerped_points = custom_math.interpolate_np(contour1.curves[c1_index].worldspace_points,
+                                                       contour2.curves[c2_index].worldspace_points,
+                                                       t)
+            last_endpoint = contour2.curves[c2_index].worldspace_points[-1]
+            lerped_contour.append_curve(curve.Bezier(lerped_points))
+    return lerped_contour
+
+
+def lerp_contours_pillow_proj(contour1, contour2, point_mapping, t):
 
     n1 = len(contour1)
     n2 = len(contour2)
@@ -861,28 +1013,25 @@ def lerp_contours_pillow_proj(contour1, contour2, point_mapping, t):
         p1, p2 = pair
         lerped_points.append(custom_math.interpolate_np(p1, p2, t))
 
-    # just make a new contour from quadratic beziers connecting each point linearly
-    prev_point = lerped_points[0]
-    point = prev_point
-    for i in range(num_pairs + 1):
-        cyclic_index = i % num_pairs
-        prev_point = point
-        point = lerped_points[cyclic_index]
-        line_points = np.array([point, custom_math.interpolate_np(point, prev_point, 0.5), prev_point])
-        new_curve = curve.Bezier(line_points)
-        lerped_contour.append_curve(new_curve)
+    lerped_contour = connect_points_with_cubic_beizers(lerped_points)
+
+    # Old but keeping this here so the logic is visible
+    # # just make a new contour from quadratic beziers connecting each point linearly
+    # prev_point = lerped_points[0]
+    # point = prev_point
+    # for i in range(num_pairs + 1):
+    #     cyclic_index = i % num_pairs
+    #     prev_point = point
+    #     point = lerped_points[cyclic_index]
+    #     line_points = np.array([point, custom_math.interpolate_np(point, prev_point, 0.5), prev_point])
+    #     new_curve = curve.Bezier(line_points)
+    #     lerped_contour.append_curve(new_curve)
 
     lerped_contour.update_bounds()
     return lerped_contour
 
 
 def lerp_contours_relative_proj(contour1, contour2, curve_mapping, t):
-    if len(contour2) > len(contour1):
-        temp = contour1
-        contour1 = contour2
-        contour2 = temp
-        t = 1 - t
-
     n1 = len(contour1)
     n2 = len(contour2)
 
@@ -904,6 +1053,7 @@ def lerp_contours_relative_proj(contour1, contour2, curve_mapping, t):
 
 
 
+# ==== Basic shape contours ====
 def get_unit_circle_contour():
     circle_const = globvar.CIRCLE_CONST
     circle_a1 = np.array([[0, 0],
@@ -946,8 +1096,106 @@ def get_unit_polygon_contour(sides, scale, angle_offset=0):
     return polygon
 
 
-# TODO fix or remove
-# def map_and_lerp(contour1, contour2, lerp_weight, mapping_function, lerping_function):
-#     mapping, mapping_score, switched = mapping_function(contour1, contour2)
-#     lerped_contour = lerping_function(contour1, contour2, mapping, lerp_weight)
-#     return lerped_contour
+"""
+From https://towardsdatascience.com/b%C3%A9zier-interpolation-8033e9a262c2 
+"""
+# find the a & b points
+def get_bezier_coef(input_points):
+    points = np.vstack([input_points, input_points[0]]) # so that we can close the contour later
+    # since the formulas work given that we have n+1 points
+    # then n must be this:
+    n = len(points) - 1
+
+    # build coefficents matrix
+    C = 4 * np.identity(n)
+    np.fill_diagonal(C[1:], 1)
+    np.fill_diagonal(C[:, 1:], 1)
+    C[0, 0] = 2
+    C[n - 1, n - 1] = 7
+    C[n - 1, n - 2] = 2
+
+    # build points vector
+    P = [2 * (2 * points[i] + points[i + 1]) for i in range(n)]
+    P[0] = points[0] + 2 * points[1]
+    P[n - 1] = 8 * points[n - 1] + points[n]
+
+    # solve system, find a & b
+    A = np.linalg.solve(C, P)
+    B = [0] * n
+    for i in range(n - 1):
+        B[i] = 2 * points[i + 1] - A[i + 1]
+    B[n - 1] = (A[n - 1] + points[n]) / 2
+
+    return A, B
+
+def connect_points_with_cubic_beizers(points):
+    A, B = get_bezier_coef(points)
+
+    cont = Contour()
+
+    num_points = len(points)
+    for i in range(num_points-1):
+        connecting_curve = curve.Bezier(np.array([points[i], A[i], B[i], points[i+1]]))
+        cont.append_curve(connecting_curve)
+
+    connecting_curve = curve.Bezier(np.array([points[-1], A[-1], B[-1], points[0]]))
+    cont.append_curve(connecting_curve)
+
+    return cont
+
+
+# @TODO Worked out on paper. Yet to be implemented.
+"""
+A custom point-to-Bezier smoothing function. Given n points, returns ceiling(n * 2/3) cubic bezier curves
+which smoothly (matching first derivative at seam points) connect the points.
+"""
+def quad_bezier_contour_from_points(points):
+    raise ValueError("Yet unimplemented!")
+    cont = Contour()
+
+    # go through the points in sets of 3 if possible
+    num_points = points.shape[0]
+    num_sets_of_three = num_points // 2     # 2 connections between 3 points so divide by 2
+
+    sets = []
+    p1 = points[0]
+    p2 = points[1]
+    p3 = None
+
+    # # begin with curve unconstrained by continuity; we'll fix it at the end
+    # if num_points > 2:
+    #     p3 = points[3]
+    #
+    #     # determine the middle control_point arbitarily with t = 0.5
+    #     p_control = (2*p2) - (0.5*(p1+p3))
+    #
+    #     # make a quadratic bezier curve with the current points
+    #     cur_curve = curve.Bezier([p1, p_control, p3])
+
+    # note that the first curve will be wrong initially; we'll fix it at the end
+
+    # 3-size sets
+    for i in range(num_sets_of_three):
+        p2 = points[(3*i)+1]
+        p3 = points[(3*i)+2]
+
+        # determine the middle control point from t = 0.5 and the previous center control_point
+        p_control = (2 * p2) - (0.5 * (p1 + p3))
+
+        # make a quadratic bezier curve with the current points
+        cur_curve = curve.Bezier([p1, p_control, p3])
+
+        # make a quadratic bezier curve with the current points
+        cur_curve = curve.Bezier()
+
+
+        sets.append([p1, p2, p3])
+
+        p1 = p3
+
+    # possible last set in case of odd number of points
+    p2 = points
+    sets.append([])
+
+
+    return cont
