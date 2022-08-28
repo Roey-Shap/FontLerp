@@ -1,14 +1,9 @@
-"# FontLerp"
-
-Copyright (c) 2022, Roey Shapiro All rights reserved.
-
-This source code is licensed under the Apache 2.0-style license found in the LICENSE.md file in the root directory of this source tree.
+# FontLerp
 
 Copyright (c) 2022, Roey Shapiro
 All rights reserved.
 
-This source code is licensed under the Apache 2.0-style license found in the
-LICENSE.md file in the root directory of this source tree. 
+This source code is licensed under the Apache 2.0-style license found in the LICENSE.md file in the root directory of this source tree. 
 
 This is a small project of mine that seeks to answer the question, "how does one linearly interpolate between two arbitrary vector-based fonts"?
 
