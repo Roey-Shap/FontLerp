@@ -74,11 +74,11 @@ drawing_full_text_mode = test_lerped_glyphs is not None
 
 
 active_letter_initial_scale = 1
-character = "g"
+character = "r"
 g1_import = ttfConverter.glyph_from_font(character, font1)
 g2_import = ttfConverter.glyph_from_font(character, font2)
 
-g1_import.worldspace_scale_by(0.1 * active_letter_initial_scale)
+g1_import.worldspace_scale_by(0.15 * active_letter_initial_scale)
 g2_import.worldspace_scale_by(0.15 * active_letter_initial_scale)
 
 

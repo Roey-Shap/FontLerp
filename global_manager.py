@@ -250,7 +250,7 @@ def insert_pillow_projection_glyph_mapping(g1, g2, mapping):
     Based on the level of zoom, adjust the accuracy with which Bezier curves are drawn.
     """
 def update_bezier_accuracy():
-    globvar.BEZIER_ACCURACY = int(1.8 * np.log2(globvar.CAMERA_ZOOM * 10)) + 2
+    globvar.BEZIER_ACCURACY = int(1.4 * np.log2(globvar.CAMERA_ZOOM * 10)) + 2
     return globvar.BEZIER_ACCURACY
 
 def calculate_t_array():

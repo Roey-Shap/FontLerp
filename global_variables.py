@@ -34,7 +34,7 @@ SCROLL_DELTA = 0.025
 POINT_DRAW_RADIUS = 3
 LINE_THICKNESS = 3
 POINTS_TO_CHECK_AVERAGE_WITH = 50                   # for the whole glyph we're getting the average for!
-POINTS_TO_GET_CONTOUR_MAPPING_WITH = 100            # for EACH contour
+POINTS_TO_GET_CONTOUR_MAPPING_WITH = 150            # for EACH contour
 EM_TO_FONT_SCALE = 0.07
 
 up_lefters = "cegikmnoswx"
