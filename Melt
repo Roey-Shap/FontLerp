@@ -1,0 +1,28 @@
+####
+
+The poem that originally motivated the project. The idea was the begin it with one font and end it with another.
+
+####
+
+
+
+t1 = "Slanted sunlight floated down through the opened windows, gently framed by the wispy curtains flowing in the breeze. \n" \
+     "The room was a gentle yellow. \n" \
+     "Grandfather lay on the bed, hypnagogic. \n" \
+     "He didn’t seem to be looking at anything, his eyes focused to some vague infinity.\n"
+
+t2 = "Watching paint dry or grass grow. \n" \
+     "Listening to a wail become a “mama” and somehow incrementally a voicemail describing college life. \n" \
+     "Cooking an egg sunny side up, or whipping cream to soft peaks. \n" \
+     "Then, it was one thing, and now, it is another. \n" \
+     "These fragile diagonal rays of sun - how long would it take them to melt this block of ice before me?"
+
+t3 = "My eyes pass over the leathery surface of Grandfather’s forehead in optic tiptoe. \n" \
+     "It would be rude to disturb his reverence… or whatever it is. \n" \
+     "It is rare to see the moment of transformation, perhaps because it is difficult to define. \n" \
+     "Theseus was unaware, but I will watch this metamorphosis. I owe it to Grandfather."
+
+t4 = "In a moment of ultimate irony, considering these things caused my own eyes to become unfocused from his pale skin. \n" \
+     "It only took that moment; I had failed to witness the transition into the end. \n" \
+     "Without my noticing, the final piece of the Grandfather had melted away. \n" \
+     "Only cold water remained. "

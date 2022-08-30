@@ -13,7 +13,7 @@ def em_to_worldspace(np_array):
 POINT_NP_DTYPE = np.float
 empty_offset = np.array([0, 0], dtype=POINT_NP_DTYPE)
 
-SCREEN_SIZE_FACTOR = 7
+SCREEN_SIZE_FACTOR = 8
 SCREEN_DIMENSIONS = np.array([160, 90]) * SCREEN_SIZE_FACTOR
 FPS = 30
 
@@ -66,8 +66,8 @@ KEY_SPACE_PRESSED = False
 
 show_current_glyph_mapping = False
 show_extra_curve_information = False
-show_mixed_glyph = True
-show_lerped_glyph_text = False
+show_mixed_glyph = False
+show_lerped_glyph_text = True
 show_evenly_space_points = False
 
 BEZIER_ACCURACY = 4

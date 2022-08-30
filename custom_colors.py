@@ -26,6 +26,8 @@ NEON_RED = pygame.Color("#ff1818")
 
 GRAY = mix_color(BLACK, WHITE, 0.45)
 LT_GRAY = mix_color(BLACK, WHITE, 0.75)
+gray_value = 0.85 * 255
+CONTOUR_FILL_GRAY = (gray_value, gray_value, gray_value)
 
 # class Color(object):
 #     def Color(self, red, green, blue, alpha):

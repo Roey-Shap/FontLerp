@@ -302,7 +302,7 @@ class Glyph(object):
         return custom_math.world_to_cameraspace(self.get_center_world())
 
 
-    def draw(self, surface, radius, width=1, color=None):
+    def draw(self, surface, radius, width=1, outline_color=None, fill_color=custom_colors.CONTOUR_FILL_GRAY):
         # drawing a glyph is expensive; let's draw it once everytime the user zooms
         # when the user pans, we can just draw where we draw the glyph's *surface*
         # see the Glyph class' "worldspace_scale_by". It's there that we let the surface be None
@@ -321,14 +321,13 @@ class Glyph(object):
             self.draw_surface = self.draw_surface.convert_alpha()
 
             # first let them draw their respective fills
-            gray_value = 0.85 * 255
-            fill_color = (gray_value, gray_value, gray_value)
+            
             for cont in self.contours:
                 cont.draw_filled_polygon(self.draw_surface, fill_color, width=width)
 
             # then let them draw their respective outlines
             for cont in self.contours:
-                cont.draw(self.draw_surface, radius, color=color, width=width)
+                cont.draw(self.draw_surface, radius, color=outline_color, width=width)
 
 
             if globvar.show_extra_curve_information:

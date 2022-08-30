@@ -42,8 +42,9 @@ glyph_box = pygame.Rect(globvar.DEFAULT_BOUNDING_BOX_UNIT_UPPER_LEFT, globvar.DE
 test_fonts = ["AndikaNewBasic-B.ttf", "OpenSans-Light.ttf", "Calligraffiti.ttf",
               "Lora-Regular.ttf", "Alef-Regular.ttf", "Lora-Italic.ttf", "Alef-Bold.ttf"]
 
+text_to_lerp = "What does a skeleton tile his roof with?\n" \
+               "Shin-gles!"
 
-test_text = "What does a skeleton \n tile his roof \n with? ... SHINgles!!!"
 
 font1 = test_fonts[4]
 font1_bold = test_fonts[6]
@@ -55,10 +56,10 @@ font_cursive = "Calligraffiti.ttf"
 
 
 test_lerped_glyphs = None
-# test_lerped_glyphs = global_manager.get_glyphs_from_text(test_text,
-#                                                          font_sans,
-#                                                          font_papyrus,
-#                                                          wrap_x=w * 1.5)
+test_lerped_glyphs = global_manager.get_glyphs_from_text(text_to_lerp,
+                                                         font_sans,
+                                                         font_papyrus,
+                                                         wrap_x=w)
 
 
 drawing_full_text_mode = test_lerped_glyphs is not None
@@ -75,8 +76,8 @@ drawing_full_text_mode = test_lerped_glyphs is not None
 
 active_letter_initial_scale = 1
 character = "r"
-g1_import = ttfConverter.glyph_from_font(character, font1)
-g2_import = ttfConverter.glyph_from_font(character, font2)
+g1_import = ttfConverter.glyph_from_font("j", font1)
+g2_import = ttfConverter.glyph_from_font("A", font2)
 
 g1_import.worldspace_scale_by(0.15 * active_letter_initial_scale)
 g2_import.worldspace_scale_by(0.15 * active_letter_initial_scale)
@@ -134,8 +135,8 @@ global_manager.make_mapping_from_active_glyphs()
 
 # make the active glyphs in nice places
 g1, g2 = globvar.active_glyphs
-g1.worldspace_offset_by(np.array([w/4, h/2]))
-g2.worldspace_offset_by(np.array([w*2/4, h/2]))
+# g1.worldspace_offset_by(np.array([w/4, h/2]))
+# g2.worldspace_offset_by(np.array([w*2/4, h/2]))
 
 # Do one step to update offsets and such
 for g in globvar.glyphs:
@@ -290,7 +291,7 @@ while running:
     # GUI drawing
     if globvar.update_screen:
         cursor.draw(screen)
-        toolbar.draw(screen)
+        # toolbar.draw(screen)
 
     # Debug drawing
     if globvar.DEBUG:

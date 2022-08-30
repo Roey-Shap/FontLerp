@@ -261,7 +261,7 @@ def calculate_t_array():
     return globvar.t_values
 
 
-def get_glyphs_from_text(text, font1, font2, wrap_x=None):
+def get_glyphs_from_text(text, font1, font2, wrap_x=None, text_start_end=None):
     lines = text.splitlines()
 
     # first find how many mappings we need; one for each character present in the text
@@ -282,36 +282,47 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
         tallest_glyph_height = max(tallest_glyph_height, g1.height, g2.height)
 
         char_mapping, score = glyph.find_glyph_contour_mapping(g1, g2, globvar.current_glyph_mapping_method)
-        character_mappings[char] = (g1, g2, char_mapping)
+        top_pre = np.array([g1.get_upper_left_world()[1], g2.get_upper_left_world()[1]])
+        character_mappings[char] = (g1, g2, char_mapping, top_pre * globvar.EM_TO_FONT_SCALE)
 
+
+    space_width = widest_glyph_width * globvar.EM_TO_FONT_SCALE
+    line_height = tallest_glyph_height * globvar.EM_TO_FONT_SCALE * 1.05
 
     # Begin building characters
+    string_length = sum(len(line)-line.count(" ") for line in lines)
+    start_character_index = 0
 
-    string_length = sum(len(line) for line in lines)  # note that this includes spaces, so the lerping has
-    # higher visual correlation with distance along the line
+    if text_start_end is not None:
+        start_character_index = text_start_end[0]
+        string_length = max(string_length, text_start_end[1])
 
-    between_character_buffer = 1
+
+    between_character_buffer = 0.05 * space_width
     current_character_count = 0
     current_draw_x = 0
     current_draw_y = 0
-    starting_line = True
+
     lerped_glyphs = []
 
-    # now we have all of the mappings we need - let's generate the text one character at a time
+    # now we have all of the mappings we need. Let's generate the text, one character at a time
     globvar.debug_width_points = []
     for line in lines:
-        for char in line:
-            globvar.debug_width_points.append([current_draw_x, current_draw_y])
-            t = current_character_count / string_length
-            if char == ' ':
-                if not starting_line:
-                    current_draw_x += widest_glyph_width * globvar.EM_TO_FONT_SCALE
-            else:
-                starting_line = False
+        words = [word for word in line.split(" ") if word is not ""]
+
+        for word in words:
+            cur_word_width = 0
+            initial_word_x = current_draw_x
+            glyphs_in_word = []
+
+            for char in word:
+                globvar.debug_width_points.append([current_draw_x, current_draw_y])
+                t = (start_character_index + current_character_count) / string_length
+                print(t)
 
                 # get mapping info
-                g1, g2, char_mapping = character_mappings[char]
-                globvar.cur_character_lerped = char                     # TODO DEBUG INFORMATION, CAN GET RID OF
+                g1, g2, char_mapping, top_pre = character_mappings[char]
+                globvar.cur_character_lerped = char
 
                 # generate the correct tween-glyph and move the draw_x accordingly
                 lerped_glyph = glyph.lerp_glyphs(g1, g2, globvar.current_glyph_lerping_method, char_mapping, t)
@@ -320,28 +331,40 @@ def get_glyphs_from_text(text, font1, font2, wrap_x=None):
 
                 # make its left side aligned with (0, 0) and then push as needed
                 offset = np.array([current_draw_x, current_draw_y]) - lerped_glyph.get_upper_left_world()
-                lerped_glyph.worldspace_offset_by(offset)
+                delta_y = (t*top_pre[0]) + ((1-t) * top_pre[1])
+
+                lerped_glyph.worldspace_offset_by(offset + np.array([0, delta_y]))
                 lerped_glyph.update_bounds()
+
+                glyphs_in_word.append(lerped_glyph)
+                cur_word_width += lerped_glyph.width + between_character_buffer
 
                 lerped_glyphs.append(lerped_glyph)
                 current_draw_x += lerped_glyph.width + between_character_buffer
 
-            if wrap_x is not None and current_draw_x >= wrap_x:
-                current_draw_x = 0
-                current_draw_y += tallest_glyph_height * globvar.EM_TO_FONT_SCALE
-                starting_line = True
+                current_character_count += 1
 
-            current_character_count += 1
+            # end a single word by checking if the word is too long; if it is, make all of its letters at the start
+            # and move the line forward
+            if wrap_x is not None and current_draw_x >= wrap_x:
+                for letter in glyphs_in_word:
+                    # bring the letter back to the start of the line, then move it down
+                    letter.worldspace_offset_by(np.array([-initial_word_x, line_height]))
+
+                current_draw_x = cur_word_width
+                current_draw_y += line_height
+
+            # do space after each word
+            current_draw_x += space_width
 
         # end line loop by resetting current horizontal position
         current_draw_x = 0
-        current_draw_y += tallest_glyph_height * globvar.EM_TO_FONT_SCALE
-        starting_line = True
+        current_draw_y += line_height
 
 
     return lerped_glyphs
 
 def draw_lerped_text(surface, lerped_glyphs):
     for g in lerped_glyphs:
-        g.draw(surface, globvar.POINT_DRAW_RADIUS, color=(0, 0, 0))
+        g.draw(surface, globvar.POINT_DRAW_RADIUS, outline_color=(0, 0, 0), fill_color=(0, 0, 0))
     return
