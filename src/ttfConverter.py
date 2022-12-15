@@ -13,7 +13,7 @@ import glyph
 def load_char_from_font(char, ttf_file_name):
     # print("Font import information")
 
-    font_url = "Test_Fonts/" + ttf_file_name
+    font_url = "../Test_Fonts/" + ttf_file_name
     font = ttfquery.describe.openFont(font_url)
     g = ttfquery.glyph.Glyph(ttfquery.glyphquery.glyphName(font, char))
     g_contours = g.calculateContours(font)

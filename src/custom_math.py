@@ -92,6 +92,7 @@ def points_clock_direction(points):
 
     return np.sign(signed_area)
 
+
 def find_point_closest_to_anchor(anchor_point, points, return_point_index=False):
     closest_point = points[0]
     closest_point_index = 0
