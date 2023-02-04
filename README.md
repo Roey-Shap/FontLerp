@@ -1,4 +1,7 @@
 # FontLerp
+![ezgif com-gif-maker (1)](https://user-images.githubusercontent.com/81587668/216793310-b600d3f4-cd12-457d-a1f8-353187ce9f34.gif)
+
+<br>
 
 ![ezgif com-gif-maker](https://user-images.githubusercontent.com/81587668/187081767-e8549ea3-c2df-4b4c-9eb4-979e2f45f68e.gif)
 
